@@ -78,3 +78,16 @@ K = 8 k-means SQs per instance, Bernoulli existence (expected loss of the first 
   step ~500 and are stable.
 - But the render shows 06's failure mode on large instances: the floor stays a k-means patchwork of ~5 slabs.
   Existence prunes redundant SQs, it cannot merge. Large instances: 2.6 SQs vs 2.0 for greedy.
+
+| run | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|
+| exist λ 1, multiscale init | 136 | 1.74 | 0.806 | 0.886 | 0.878 | 0.922 | 0.685 | 1.0 / 2.3 / 1.2 / 2.0 | 0.80 / 0.78 / 0.80 / 0.86 |
+| exist λ 3 | 123 | 1.58 | 0.801 | 0.878 | 0.879 | 0.931 | 0.666 | 1.0 / 2.0 / 1.2 / 1.8 | 0.84 / 0.76 / 0.80 / 0.83 |
+| greedy v2 (δ 0.03) | 146 | 1.87 | 0.809 | 0.882 | 0.867 | 0.898 | 0.644 | 1.8 / 2.1 / 1.7 / 1.8 | 0.86 / 0.70 / 0.85 / 0.88 |
+- Multi-scale init (slot 0 = whole-instance box, slots 1-7 = k-means parts) only partly helps: floor 5 -> 4 pieces.
+  The whole-instance slot co-adapts with the parts (it shrinks to its own share instead of making them redundant).
+- λ 3: fewest SQs at about the greedy quality, but the floor is still 3 slabs.
+- Take-away for the feed-forward direction: the volumetric loss + existence + parsimony is a viable *training*
+  objective (budget / quality on par with the search, small objects even cleaner), but it inherits the inability to
+  merge, so large planar instances end up as a few slabs. Options: supervise the network with the greedy results
+  (distillation), or add a merge-friendly term; the search result is the better target for now.
