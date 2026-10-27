@@ -12,5 +12,5 @@ print("|---" * (len(cols) + 3) + "|")
 for n in names:
     s = json.loads((RUNS / n / "metrics.json").read_text())["summary"]
     f = lambda v: f"{v:.3f}" if isinstance(v, float) else str(v)
-    print(f"| {n} | " + " | ".join(f(s[c]) for c in cols) +
+    print(f"| {n} | " + " | ".join(f(s.get(c, float("nan"))) for c in cols) +
           f" | {' / '.join(f'{v:.1f}' for v in s['K_by_size'])} | {' / '.join(f'{v:.2f}' for v in s['viou_by_size'])} |")

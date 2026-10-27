@@ -38,7 +38,7 @@ CFG = dict(
     samples_pos=512, samples_neg=1024, tau=0.02, tau_final=0.01,
     lr=0.01, steps_init=400, steps_round=250, rounds=8, steps_final=300,
     delta=0.03, prune_delta=0.03, max_fail=3, prune_rounds=3, min_comp=4,
-    eps_init=0.5, seed=0, only="", verbose=False,
+    eps_init=0.5, eps_max=1.2, steps_warm=100, seed=0, only="", verbose=False,
 )
 
 
@@ -218,12 +218,16 @@ def propose(cfg, model, D, ev, i, rng, flip=False):
 
 # ---------------------------------------------------------------- main loop
 
-def optimize(cfg, model, D, steps, g, tau, lr):
+def optimize(cfg, model, D, steps, g, tau, lr, only_slots=None):
+    """Adam on all SQs; with only_slots (I, K) bool, the other slots are frozen."""
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     for s in range(steps):
         loss, _ = loss_fn(cfg, model, D, g, tau)
         opt.zero_grad()
         loss.backward()
+        if only_slots is not None:
+            for p in model.parameters():
+                p.grad[~only_slots] = 0
         opt.step()
     return loss.item()
 
@@ -256,7 +260,7 @@ def run(cfg, name):
     D = prepare(cfg, sc, vol)
     I, K = D["I"], cfg["K"]
     print(f"{I} instances, {len(D['pos_x'])} target voxels, {len(D['neg_x'])} negatives, prep {time.time() - t0:.0f} s")
-    model = SQSet(I, K)
+    model = SQSet(I, K, eps_range=(0.1, cfg["eps_max"]))
     for i in range(I):
         x = D["pos_x"][D["pos_i"] == i].numpy()
         t, R, a = box_fit(x, cfg["res"])
@@ -272,6 +276,7 @@ def run(cfg, name):
         iou_before = ev["iou"].clone()
         proposed = np.zeros(I, bool)
         kinds = {}
+        new_slots = torch.zeros(I, K, dtype=torch.bool)
         for i in range(I):
             if fails[i] >= cfg["max_fail"]:
                 continue
@@ -282,9 +287,12 @@ def run(cfg, name):
             kinds[i] = p[0]
             for (j, t, R, a) in p[1]:
                 model.set_slot(i, j, t, R, a, (cfg["eps_init"], cfg["eps_init"]))
+                new_slots[i, j] = True
             proposed[i] = True
         if not proposed.any():
             break
+        if cfg["steps_warm"]:
+            optimize(cfg, model, D, cfg["steps_warm"], g, cfg["tau"], cfg["lr"], only_slots=new_slots)
         optimize(cfg, model, D, cfg["steps_round"], g, cfg["tau"], cfg["lr"])
         ev = evaluate(model, D)
         gain = (ev["iou"] - iou_before).numpy()
