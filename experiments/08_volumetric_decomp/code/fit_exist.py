@@ -42,7 +42,7 @@ def run(cfg, name):
     torch.manual_seed(cfg["seed"])
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"])
     from pathlib import Path
-    cache = Path("/tmp/claude-0/volcache") / f"{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_v2.npz"
+    cache = Path("/tmp/claude-0/volcache") / f"{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_instance_v2.npz"
     if cache.exists():
         vol = dict(np.load(cache))
         vol["res"] = float(vol["res"])

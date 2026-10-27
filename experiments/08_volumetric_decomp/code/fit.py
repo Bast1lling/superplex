@@ -12,7 +12,9 @@ Structure (greedy, all instances in parallel): start with 1 SQ (PCA box of T_k).
 instance: *add* an SQ on the largest connected component of uncovered target voxels, or *split* the SQ that covers
 the most negatives (2-means of its target voxels). After `steps_round` joint steps the change is kept only if the
 instance's hard volumetric IoU rose by more than `delta`; otherwise the instance is restored. Finally SQs whose
-removal costs less than `prune_delta` IoU are pruned. delta is the price of one primitive in IoU (MDL-style).
+removal costs less than `prune_delta` IoU are pruned. delta is the price of one primitive in IoU (MDL-style);
+`min_gain_vox` additionally requires a primitive to explain a minimum absolute volume (IoU gain x |T_k| voxels),
+which stops tiny objects (a few voxels, where one voxel is a large IoU change) from being split.
 """
 
 import argparse
@@ -32,12 +34,12 @@ EXP = Path(__file__).resolve().parents[1]
 RUNS = EXP / "results" / "runs"
 
 CFG = dict(
-    scene="room_0", res=0.04, min_points=20,      # instances with fewer (2 cm) points are dropped
+    scene="room_0", labels="instance", res=0.04, min_points=20,      # instances with fewer (2 cm) points are dropped
     K=8, margin=0.3, max_neg=200000,
     w_free=1.0, w_other=0.3, w_unknown=0.1, w_region=10.0,
     samples_pos=512, samples_neg=1024, tau=0.02, tau_final=0.01,
     lr=0.01, steps_init=400, steps_round=250, rounds=8, steps_final=300,
-    delta=0.03, prune_delta=0.03, max_fail=3, prune_rounds=3, min_comp=4,
+    delta=0.03, prune_delta=0.03, max_fail=3, prune_rounds=3, min_gain_vox=15.0, min_comp=4,
     eps_init=0.5, eps_max=1.2, steps_warm=100, seed=0, only="", verbose=False,
 )
 
@@ -248,8 +250,8 @@ def run(cfg, name):
     torch.manual_seed(cfg["seed"])
     g = torch.Generator().manual_seed(cfg["seed"])
     rng = np.random.default_rng(cfg["seed"])
-    sc = load_scene(cfg["scene"], min_points=cfg["min_points"])
-    cache = Path("/tmp/claude-0/volcache") / f"{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_v2.npz"
+    sc = load_scene(cfg["scene"], min_points=cfg["min_points"], labels=cfg["labels"])
+    cache = Path("/tmp/claude-0/volcache") / f"{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_{cfg['labels']}_v2.npz"
     if cache.exists():
         vol = dict(np.load(cache))
         vol["res"] = float(vol["res"])
@@ -296,7 +298,8 @@ def run(cfg, name):
         optimize(cfg, model, D, cfg["steps_round"], g, cfg["tau"], cfg["lr"])
         ev = evaluate(model, D)
         gain = (ev["iou"] - iou_before).numpy()
-        accept = proposed & (gain > cfg["delta"])
+        npos = D["n_pos"].numpy()
+        accept = proposed & (gain > cfg["delta"]) & (gain * npos > cfg["min_gain_vox"])
         reject = proposed & ~accept
         rej = torch.from_numpy(np.nonzero(reject)[0])
         restore_rows(model, rej, {k: v[rej] for k, v in snap.items()})
@@ -326,7 +329,8 @@ def run(cfg, name):
         model.active[rows, j[rows]] = False
         optimize(cfg, model, D, cfg["steps_round"], g, cfg["tau"], cfg["lr"])
         ev = evaluate(model, D)
-        ok = cand & (ev["iou"] > iou_before - cfg["prune_delta"])
+        drop = iou_before - ev["iou"]
+        ok = cand & ((drop < cfg["prune_delta"]) | (drop * D["n_pos"] < cfg["min_gain_vox"]))
         rej = torch.nonzero(cand & ~ok)[:, 0]
         restore_rows(model, rej, {k: v[rej] for k, v in snap.items()})
         ev = evaluate(model, D)

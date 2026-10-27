@@ -91,3 +91,24 @@ K = 8 k-means SQs per instance, Bernoulli existence (expected loss of the first 
   objective (budget / quality on par with the search, small objects even cleaner), but it inherits the inability to
   merge, so large planar instances end up as a few slabs. Options: supervise the network with the greedy results
   (distillation), or add a merge-friendly term; the search result is the better target for now.
+
+## "Human-likeness" proxy: plausible K per class (`code/plausible.py`)
+A hand-written table of the number of SQs I would draw per class (floor / rug / door / picture / cushion / book:
+1; window, ceiling, stool, cabinet: 1-2; chair, lamp, bed: 1-3; sofa / wall: 1-4; table: 1-5; ...). Reported as the
+share of instances whose K lies in the range (and the share over-split). It is crude (my judgment, class-level), but
+it makes over-splitting visible, which vIoU rewards. Shown in `compare.py` output:
+- 06 baseline: 0.24 plausible (76% over-split). Greedy v2: 0.74 (26% over-split, mostly *small* objects: books,
+  cushions, wall plugs with 2-3 SQs; at 4 cm voxels one voxel is a big relative IoU change, so δ in IoU is too cheap
+  for tiny objects). Existence λ 3: 0.85.
+- -> v4: a primitive must also explain >= `min_gain_vox` voxels (IoU gain x |T_k|), for adding and for pruning.
+
+## v3: ε in [0.1, 1.2], 100 warm-up steps in which only the new / split SQs move
+| run | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| room0_v2 | 146 | 1.87 | 0.809 | 0.882 | 0.867 | 0.898 | 0.644 | 0.74 | 1.8 / 2.1 / 1.7 / 1.8 | 0.86 / 0.70 / 0.85 / 0.88 |
+| room0_v3 | 147 | 1.89 | 0.833 | 0.895 | 0.887 | 0.918 | 0.687 | 0.74 | 1.5 / 2.2 / 1.8 / 1.8 | 0.88 / 0.73 / 0.86 / 0.91 |
+| room1_v2 | 86 | 1.69 | 0.808 | 0.868 | 0.869 | 0.910 | 0.637 | 0.73 | 1.6 / 1.2 / 1.8 / 2.0 | 0.88 / 0.63 / 0.84 / 0.87 |
+| room1_v3 | 95 | 1.86 | 0.814 | 0.875 | 0.869 | 0.908 | 0.643 | 0.63 | 1.8 / 1.5 / 2.0 / 2.1 | 0.88 / 0.64 / 0.86 / 0.87 |
+- room_0: same budget, +0.024 vIoU; renders lose the ring artifacts of ε > 1 shapes and the front wall becomes one
+  slab with no tilted pieces. Floor: 2 slabs in this run (1 in v2): the merge via prune-with-refit is not reliable.
+- room_1: more SQs (warm-up makes adds succeed more often), plausibility down (over-splitting), vIoU barely up.

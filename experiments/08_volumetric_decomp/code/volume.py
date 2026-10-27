@@ -24,7 +24,24 @@ DATA = ROOT / "data"
 FREE, UNKNOWN = -1, -2
 
 
-def load_scene(scene: str, drop_unlabeled: bool = True, min_points: int = 1) -> dict:
+def semantic_components(pos: np.ndarray, lab: np.ndarray, radius: float = 0.05) -> np.ndarray:
+    """Pseudo-instances from semantic labels only: connected components (points closer than radius) per class."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    out = np.zeros(len(pos), np.int64)
+    nxt = 0
+    for c in np.unique(lab):
+        idx = np.nonzero(lab == c)[0]
+        pairs = cKDTree(pos[idx]).query_pairs(radius, output_type="ndarray")
+        A = coo_matrix((np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])), shape=(len(idx), len(idx)))
+        n, cc = connected_components(A, directed=False)
+        out[idx] = nxt + cc
+        nxt += n
+    return out
+
+
+def load_scene(scene: str, drop_unlabeled: bool = True, min_points: int = 1, labels: str = "instance") -> dict:
+    """labels: "instance" (GT instances) or "semantic" (connected components of each GT class)."""
     d = np.load(DATA / "replica_v1_points" / f"{scene}_voxel20mm.npz")
     sem = json.loads((DATA / "replica_v1" / scene / "habitat" / "info_semantic.json").read_text())
     names = {c["id"]: c["name"] for c in sem["classes"]}
@@ -34,6 +51,8 @@ def load_scene(scene: str, drop_unlabeled: bool = True, min_points: int = 1) -> 
     lab = i2l[np.minimum(inst, len(i2l) - 1)]
     keep = lab > 0 if drop_unlabeled else np.ones(len(pos), bool)
     pos, nrm, inst, col, lab = pos[keep], nrm[keep], inst[keep], col[keep], lab[keep]
+    if labels == "semantic":
+        inst = semantic_components(pos, lab)
     ids, y, cnt = np.unique(inst, return_inverse=True, return_counts=True)
     if min_points > 1:  # drop tiny instances (a few points: wall plugs etc.)
         ok = cnt[y] >= min_points
