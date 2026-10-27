@@ -13,3 +13,6 @@ Some more advice:
 2. When researching it is worth to pursue a certain direction for a bit longer, even if it does not seem promising.
 3. Always make cheap experiments first, before trying anything time-intensive.
 4. Document whatever you try, so I can understand it later when I look at this branch.
+5. This should still be a private GitHub repo. Thus, don't commit any large files etc and keep everything clean and organized.
+
+Good luck!
