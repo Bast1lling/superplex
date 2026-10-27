@@ -6,6 +6,8 @@ Solid voxels whose nearest point belongs to a structural class (wall / floor / c
 outside the room) are only kept up to `exterior_depth` behind the surface, so these become slabs; any solid voxel
 deeper than `max_depth` is unknown as well. Finally, an instance's solid is clipped to its gravity-aligned oriented
 bounding box (yaw from PCA of its points) padded by `box_pad` (removes e.g. space behind windows / blinds).
+Free voxels outside the room box (oriented box of the structural points) or within `room_band` of its faces are
+unknown: free space seen through windows / glass doors is not reliably observed (window frames have no glass).
 Voxels that contain points of an instance always count as that instance's solid (thin objects).
 
 Labels:  -1 free (observed empty space), -2 unknown (deep exterior), >= 0 instance index (0..n_inst-1).
@@ -47,7 +49,8 @@ STRUCTURAL = ("wall", "floor", "ceiling")
 
 
 def build_volume(sc: dict, res: float = 0.04, pad: float = 0.2, knn: int = 8,
-                 exterior_depth: float = 0.1, max_depth: float = 1.0, box_pad: float = None) -> dict:
+                 exterior_depth: float = 0.1, max_depth: float = 1.0, box_pad: float = None,
+                 room_band: float = 0.06) -> dict:
     pos, nrm, y = sc["pos"], sc["nrm"], sc["y"]
     lo = pos.min(0) - pad
     dims = np.ceil((pos.max(0) + pad - lo) / res).astype(int) + 1
@@ -79,6 +82,13 @@ def build_volume(sc: dict, res: float = 0.04, pad: float = 0.2, knn: int = 8,
     first = ok.argmax(1)
     has = ok.any(1)
     flat[sol] = np.where(has, cand[np.arange(len(sol)), first], UNKNOWN)
+    # free space outside the room (seen through windows / doors / glass) is not reliably observed
+    sp = np.isin(y, np.nonzero(structural)[0])
+    if room_band is not None and sp.any():
+        R, c, half = yaw_box(pos[sp])
+        q = np.abs((centers - c) @ R)
+        outside = (q > half - room_band).any(1).reshape(dims)
+        label[outside & (label == FREE)] = UNKNOWN
     # voxels containing points
     vi = np.clip(np.round((pos - lo) / res).astype(int), 0, dims - 1)
     label[vi[:, 0], vi[:, 1], vi[:, 2]] = y  # (last writer wins for shared voxels)

@@ -34,11 +34,11 @@ RUNS = EXP / "results" / "runs"
 CFG = dict(
     scene="room_0", res=0.04, min_points=20,      # instances with fewer (2 cm) points are dropped
     K=8, margin=0.3, max_neg=200000,
-    w_free=1.0, w_other=1.0, w_unknown=0.3, w_region=10.0,
+    w_free=1.0, w_other=0.3, w_unknown=0.1, w_region=10.0,
     samples_pos=512, samples_neg=1024, tau=0.02, tau_final=0.01,
     lr=0.01, steps_init=400, steps_round=250, rounds=8, steps_final=300,
-    delta=0.03, prune_delta=0.015, max_fail=2, min_comp=4,
-    eps_init=0.5, seed=0,
+    delta=0.03, prune_delta=0.03, max_fail=3, prune_rounds=3, min_comp=4,
+    eps_init=0.5, seed=0, only="", verbose=False,
 )
 
 
@@ -55,17 +55,19 @@ def prepare(cfg, sc, vol):
     """Flat target / negative voxel arrays per instance."""
     L, lo, res, dims = vol["label"], vol["lo"], vol["res"], vol["dims"]
     rng = np.random.default_rng(cfg["seed"])
-    I = len(sc["instance_ids"])
+    sel_ids = [int(v) for v in cfg["only"].split(",")] if cfg["only"] else None
+    ks = [k for k in range(len(sc["instance_ids"])) if sel_ids is None or sc["instance_ids"][k] in sel_ids]
+    I = len(ks)
     pos_x, pos_i, pos_v, neg_x, neg_i, neg_w = [], [], [], [], [], []
     region_lo, region_hi = [], []
     n_pos, n_neg = np.zeros(I, int), np.zeros(I, int)
     flatL = L.reshape(-1)
-    for k in range(I):
+    for ii, k in enumerate(ks):
         vox = np.argwhere(L == k)
         if len(vox) == 0:  # fully overwritten: use the voxels of its points
             vox = np.unique(np.clip(np.round((sc["pos"][sc["y"] == k] - lo) / res).astype(int), 0, dims - 1), axis=0)
-        pos_x.append(lo + vox * res), pos_i.append(np.full(len(vox), k)), pos_v.append(vox)
-        n_pos[k] = len(vox)
+        pos_x.append(lo + vox * res), pos_i.append(np.full(len(vox), ii)), pos_v.append(vox)
+        n_pos[ii] = len(vox)
         m = int(np.ceil(cfg["margin"] / res))
         a, b = np.maximum(vox.min(0) - m, 0), np.minimum(vox.max(0) + m + 1, dims)
         sub = L[a[0]:b[0], a[1]:b[1], a[2]:b[2]]
@@ -77,15 +79,15 @@ def prepare(cfg, sc, vol):
             sel = rng.choice(len(neg), cfg["max_neg"], replace=False)
             w = w[sel] * len(neg) / cfg["max_neg"]
             neg = neg[sel]
-        neg_x.append(lo + neg * res), neg_i.append(np.full(len(neg), k)), neg_w.append(w)
-        n_neg[k] = len(neg)
+        neg_x.append(lo + neg * res), neg_i.append(np.full(len(neg), ii)), neg_w.append(w)
+        n_neg[ii] = len(neg)
     f = lambda a, dt=np.float32: torch.from_numpy(np.concatenate(a).astype(dt))
     return {"pos_x": f(pos_x), "pos_i": f(pos_i, np.int64), "pos_v": np.concatenate(pos_v),
             "neg_x": f(neg_x), "neg_i": f(neg_i, np.int64), "neg_w": f(neg_w),
             "region_lo": f(region_lo), "region_hi": f(region_hi),
             "n_pos": torch.from_numpy(n_pos), "n_neg": torch.from_numpy(n_neg),
             "off_pos": torch.from_numpy(np.concatenate([[0], np.cumsum(n_pos)[:-1]])),
-            "off_neg": torch.from_numpy(np.concatenate([[0], np.cumsum(n_neg)[:-1]])), "I": I}
+            "off_neg": torch.from_numpy(np.concatenate([[0], np.cumsum(n_neg)[:-1]])), "I": I, "ks": ks}
 
 
 def sample(D, n, which, g):
@@ -184,7 +186,7 @@ def largest_component(vox):
     return np.nonzero(lab[tuple((vox - a).T)] == best)[0]
 
 
-def propose(cfg, model, D, ev, i, rng):
+def propose(cfg, model, D, ev, i, rng, flip=False):
     """One structural proposal for instance i. Returns a description or None."""
     K, res = model.K, cfg["res"]
     free = np.nonzero(~model.active[i].numpy())[0]
@@ -199,7 +201,11 @@ def propose(cfg, model, D, ev, i, rng):
     fn_mass = len(comp)
     slot_fp = ev["slot_fp"][i].numpy() * act
     j = int(slot_fp.argmax())
-    if fn_mass >= cfg["min_comp"] and fn_mass >= slot_fp[j]:
+    can_add = fn_mass >= cfg["min_comp"]
+    prefer_add = fn_mass >= slot_fp[j]
+    if flip:  # after a failed proposal try the other kind first
+        prefer_add = not prefer_add
+    if can_add and (prefer_add or slot_fp[j] <= 0):
         t, R, a = box_fit(x[uncovered][comp], res)
         return ("add", [(int(free[0]), t, R, a)])
     owned = (dp.argmin(1).numpy() == j) & (dp[:, j] < 0).numpy()
@@ -239,7 +245,14 @@ def run(cfg, name):
     g = torch.Generator().manual_seed(cfg["seed"])
     rng = np.random.default_rng(cfg["seed"])
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"])
-    vol = build_volume(sc, res=cfg["res"])
+    cache = Path("/tmp/claude-0/volcache") / f"{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_v2.npz"
+    if cache.exists():
+        vol = dict(np.load(cache))
+        vol["res"] = float(vol["res"])
+    else:
+        vol = build_volume(sc, res=cfg["res"])
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(cache, **vol)
     D = prepare(cfg, sc, vol)
     I, K = D["I"], cfg["K"]
     print(f"{I} instances, {len(D['pos_x'])} target voxels, {len(D['neg_x'])} negatives, prep {time.time() - t0:.0f} s")
@@ -262,7 +275,7 @@ def run(cfg, name):
         for i in range(I):
             if fails[i] >= cfg["max_fail"]:
                 continue
-            p = propose(cfg, model, D, ev, i, rng)
+            p = propose(cfg, model, D, ev, i, rng, flip=bool(fails[i] % 2))
             if p is None:
                 fails[i] = cfg["max_fail"]
                 continue
@@ -279,6 +292,10 @@ def run(cfg, name):
         reject = proposed & ~accept
         rej = torch.from_numpy(np.nonzero(reject)[0])
         restore_rows(model, rej, {k: v[rej] for k, v in snap.items()})
+        if cfg["verbose"]:
+            for i in np.nonzero(proposed)[0]:
+                print(f"  inst {sc['instance_ids'][D['ks'][i]]} {sc['class_name'][D['ks'][i]]}: {kinds[i]} "
+                      f"iou {iou_before[i]:.3f} -> {iou_before[i] + gain[i]:.3f} {'ACCEPT' if accept[i] else 'reject'}")
         fails[proposed & ~accept] += 1
         fails[accept] = 0
         ev = evaluate(model, D)
@@ -287,16 +304,27 @@ def run(cfg, name):
                     "gain_median": float(np.median(gain[proposed])), "iou": ev["iou"].mean().item(),
                     "sqs": int(model.active.sum()), "t": time.time() - t0})
         print(log[-1])
-    # prune: remove the slot whose removal costs least, if below prune_delta (one per instance per pass)
-    for _ in range(K):
-        cost = (ev["iou"][:, None] - ev["iou_wo"]).masked_fill(~model.active, 1e9)
-        cost = cost.masked_fill(model.active.sum(1, keepdim=True) <= 1, 1e9)
-        j = cost.argmin(1)
-        drop = cost.gather(1, j[:, None])[:, 0] < cfg["prune_delta"]
-        if not drop.any():
+    # prune with refit: drop the cheapest SQ of every instance with > 1 SQ, re-optimize, keep the removal if the
+    # IoU dropped by less than prune_delta (the neighbours may grow into the gap: acts as a merge move)
+    for r in range(cfg["prune_rounds"]):
+        cand = model.active.sum(1) > 1
+        if not cand.any():
             break
-        model.active[torch.nonzero(drop)[:, 0], j[drop]] = False
+        snap = snapshot_rows(model, torch.arange(I))
+        iou_before = ev["iou"].clone()
+        cost = (ev["iou"][:, None] - ev["iou_wo"]).masked_fill(~model.active, 1e9)
+        j = cost.argmin(1)
+        rows = torch.nonzero(cand)[:, 0]
+        model.active[rows, j[rows]] = False
+        optimize(cfg, model, D, cfg["steps_round"], g, cfg["tau"], cfg["lr"])
         ev = evaluate(model, D)
+        ok = cand & (ev["iou"] > iou_before - cfg["prune_delta"])
+        rej = torch.nonzero(cand & ~ok)[:, 0]
+        restore_rows(model, rej, {k: v[rej] for k, v in snap.items()})
+        ev = evaluate(model, D)
+        log.append({"round": f"prune{r}", "tried": int(cand.sum()), "removed": int(ok.sum()), "iou": ev["iou"].mean().item(),
+                    "sqs": int(model.active.sum()), "t": time.time() - t0})
+        print(log[-1])
     optimize(cfg, model, D, cfg["steps_final"], g, cfg["tau_final"], cfg["lr"] * 0.3)
     ev = evaluate(model, D)
     log.append({"round": "final", "iou": ev["iou"].mean().item(), "sqs": int(model.active.sum()), "t": time.time() - t0})
@@ -327,9 +355,10 @@ def main():
     ap.add_argument("--set", action="append", default=[])
     args = ap.parse_args()
     cfg = parse_set(dict(CFG), args.set)
-    torch.set_num_threads(4)
+    torch.set_num_threads(int(__import__("os").environ.get("THREADS", 4)))
     res = run(cfg, args.name)
-    save(cfg, args.name, *res)
+    if not cfg["only"]:
+        save(cfg, args.name, *res)
 
 
 if __name__ == "__main__":
