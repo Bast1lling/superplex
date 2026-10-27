@@ -1,0 +1,21 @@
+diff --git a/sonata/model.py b/sonata/model.py
+index 40f6a65..635b1cc 100644
+--- a/sonata/model.py
++++ b/sonata/model.py
+@@ -234,6 +234,16 @@ class SerializedAttention(PointModule):
+             if self.upcast_attention:
+                 q = q.float()
+                 k = k.float()
++            if not self.enable_rpe:
++                # [superplex patch] fused SDPA instead of materializing (N', H, K, K) attention (no flash-attn here)
++                drop = self.attn_drop.p if isinstance(self.attn_drop, nn.Dropout) else float(self.attn_drop)
++                feat = nn.functional.scaled_dot_product_attention(
++                    q, k.to(q.dtype), v.to(q.dtype), dropout_p=drop if self.training else 0.0, scale=self.scale
++                ).to(qkv.dtype).transpose(1, 2).reshape(-1, C)
++                feat = feat[inverse]
++                feat = self.proj_drop(self.proj(feat))
++                point.feat = feat
++                return point
+             attn = (q * self.scale) @ k.transpose(-2, -1)  # (N', H, K, K)
+             if self.enable_rpe:
+                 attn = attn + self.rpe(self.get_rel_pos(point, order))

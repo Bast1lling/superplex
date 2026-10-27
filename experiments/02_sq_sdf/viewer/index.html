@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SQ SDF Errors</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #15171c; --panel: rgba(30, 33, 40, 0.94); --fg: #e4e6eb; --muted: #9aa0ab; --accent: #6aa8ff; --line: #3a3f4b; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  .panel { position: absolute; top: 12px; padding: 10px 14px; background: var(--panel); border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.4); max-height: calc(100% - 48px); overflow-y: auto; }
+  #left { left: 12px; width: 250px; }
+  #right { right: 12px; width: 470px; }
+  h2 { font-size: 13px; margin: 10px 0 4px; color: var(--fg); }
+  h2:first-child { margin-top: 0; }
+  label { display: block; margin: 6px 0 2px; color: var(--muted); }
+  select, input[type=range] { width: 100%; box-sizing: border-box; }
+  select { background: #262a33; color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; font: inherit; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row > span:first-child { width: 22px; color: var(--muted); }
+  .row > span:last-child { min-width: 40px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .check { display: flex; gap: 6px; align-items: center; margin-top: 6px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 3px 5px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: #262a33; }
+  tbody tr.sel { background: #2b3445; }
+  #bar { height: 12px; border-radius: 3px; margin-top: 6px; }
+  #barLabels { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  #loading { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); color: var(--muted); display: none; }
+</style>
+<script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  } }
+</script>
+</head>
+<body>
+<div id="left" class="panel">
+  <h2>Superquadric</h2>
+  <label for="preset">Preset</label>
+  <select id="preset"></select>
+  <label>Half-extents a</label>
+  <div class="row"><span>a1</span><input id="a1" type="range" min="0.1" max="2" step="0.05" value="1"><span id="a1v"></span></div>
+  <div class="row"><span>a2</span><input id="a2" type="range" min="0.1" max="2" step="0.05" value="0.6"><span id="a2v"></span></div>
+  <div class="row"><span>a3</span><input id="a3" type="range" min="0.1" max="2" step="0.05" value="0.4"><span id="a3v"></span></div>
+  <label>Exponents ε</label>
+  <div class="row"><span>ε1</span><input id="e1" type="range" min="0.1" max="2" step="0.05" value="0.5"><span id="e1v"></span></div>
+  <div class="row"><span>ε2</span><input id="e2" type="range" min="0.1" max="2" step="0.05" value="0.5"><span id="e2v"></span></div>
+  <label for="res">Grid resolution (longest axis)</label>
+  <select id="res"><option>16</option><option>24</option><option selected>32</option><option>48</option><option>64</option></select>
+  <label>Padding around the SQ (× max a)</label>
+  <div class="row"><span></span><input id="pad" type="range" min="0" max="1.5" step="0.05" value="0.5"><span id="padv"></span></div>
+
+  <h2>Display</h2>
+  <label for="method">Method</label>
+  <select id="method"></select>
+  <label for="quantity">Quantity</label>
+  <select id="quantity">
+    <option value="err">error (method − GT)</option>
+    <option value="abs">|error|</option>
+    <option value="rel">relative |error| / |GT|</option>
+    <option value="sdf">method SDF</option>
+    <option value="gt">GT SDF</option>
+  </select>
+  <label for="region">Voxels</label>
+  <select id="region">
+    <option value="all">all</option>
+    <option value="near">near surface</option>
+    <option value="inside">inside</option>
+    <option value="outside">outside</option>
+  </select>
+  <label for="cutAxis">Cut</label>
+  <select id="cutAxis"><option value="-1">none</option><option value="0">x</option><option value="1" selected>y</option><option value="2">z</option></select>
+  <div class="row"><span></span><input id="cut" type="range" min="-1" max="1" step="0.01" value="0"><span id="cutv"></span></div>
+  <label>Hide |value| below (× color range)</label>
+  <div class="row"><span></span><input id="thr" type="range" min="0" max="1" step="0.01" value="0"><span id="thrv"></span></div>
+  <label>Color range (× auto)</label>
+  <div class="row"><span></span><input id="range" type="range" min="-2" max="1" step="0.05" value="0"><span id="rangev"></span></div>
+  <label>Voxel size</label>
+  <div class="row"><span></span><input id="vsize" type="range" min="0.2" max="1" step="0.05" value="0.9"><span id="vsizev"></span></div>
+  <label class="check"><input id="surf" type="checkbox" checked> show SQ surface</label>
+  <div id="bar"></div>
+  <div id="barLabels"><span id="barLo"></span><span id="barMid"></span><span id="barHi"></span></div>
+</div>
+
+<div id="right" class="panel">
+  <h2>Error vs. reference <span id="regionName" style="color: var(--muted); font-weight: 400"></span></h2>
+  <table>
+    <thead><tr><th>method</th><th>MAE</th><th>RMSE</th><th>max</th><th>bias</th><th>sign err</th><th>≤ GT</th><th>ms</th></tr></thead>
+    <tbody id="stats"></tbody>
+  </table>
+  <div class="note" id="info"></div>
+  <div class="note">bias = mean(method − GT) · sign err = inside/outside disagreement · ≤ GT = share of voxels where |method| ≤ |GT| (lower bound) · ms = GPU time for this grid, indicative only (first calls include warm-up). Click a row to display it.</div>
+</div>
+<div id="loading">computing…</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const $ = (id) => document.getElementById(id);
+const PRESETS = {
+  "rounded box": [0.4, 0.4], box: [0.1, 0.1], ellipsoid: [1, 1], cylinder: [0.1, 1], octahedron: [2, 2],
+  "double cone": [2, 1], "diamond prism": [0.1, 2], pillow: [0.5, 1],
+};
+
+// ---------- three.js setup ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15171c);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100);
+camera.up.set(0, 0, 1);
+camera.position.set(3.2, -4.2, 2.6);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8890a0, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+sun.position.set(2, -3, 4);
+scene.add(sun);
+scene.add(new THREE.AxesHelper(0.3));
+
+const voxelMat = new THREE.MeshLambertMaterial();
+let voxels = null;
+const surfMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.18 });
+let surface = null;
+
+// ---------- state ----------
+let field = null; // server response with decoded arrays
+const decode = (s) => new Float32Array(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer);
+
+function shape() {
+  return {
+    scale: ["a1", "a2", "a3"].map((k) => parseFloat($(k).value)),
+    eps: ["e1", "e2"].map((k) => parseFloat($(k).value)),
+    res: parseInt($("res").value),
+    pad: parseFloat($("pad").value),
+  };
+}
+
+function gauge(x, y, z, a, e) {
+  const s = Math.abs(x / a[0]) ** (2 / e[1]) + Math.abs(y / a[1]) ** (2 / e[1]);
+  return (s ** (e[1] / e[0]) + Math.abs(z / a[2]) ** (2 / e[0])) ** (e[0] / 2);
+}
+
+function buildSurface() {
+  const { scale: a, eps: e } = shape();
+  const geom = new THREE.BoxGeometry(2, 2, 2, 24, 24, 24); // cube-sphere: radial projection onto the SQ
+  const p = geom.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const v = new THREE.Vector3(p.getX(i), p.getY(i), p.getZ(i)).normalize().multiply(new THREE.Vector3(...a));
+    v.divideScalar(gauge(v.x, v.y, v.z, a, e));
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  if (surface) { scene.remove(surface); surface.geometry.dispose(); }
+  surface = new THREE.Mesh(geom, surfMat);
+  surface.visible = $("surf").checked;
+  scene.add(surface);
+}
+
+async function compute() {
+  $("loading").style.display = "block";
+  const body = JSON.stringify(shape());
+  const res = await fetch("/api/field", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+  const f = await res.json();
+  f.gtArr = decode(f.gt);
+  f.arrs = Object.fromEntries(Object.entries(f.methods).map(([k, v]) => [k, decode(v)]));
+  field = f;
+  if (!$("method").options.length) {
+    for (const k of Object.keys(f.arrs)) $("method").add(new Option(k, k));
+    $("method").value = "taubin";
+  }
+  $("loading").style.display = "none";
+  $("info").textContent = `grid ${f.dims.join(" × ")} = ${f.gtArr.length.toLocaleString()} voxels, voxel ${f.voxel.toFixed(3)} · ` +
+    `near surface = |GT| < ${f.near_band.toFixed(3)} · reference ${f.times_ms.reference.toFixed(0)} ms`;
+  buildVoxels();
+  render();
+}
+
+function buildVoxels() {
+  if (voxels) { scene.remove(voxels); voxels.dispose(); }
+  voxels = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), voxelMat, field.gtArr.length);
+  voxels.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(voxels);
+}
+
+// ---------- coloring ----------
+const BLUE = [0.23, 0.30, 0.75], WHITE = [0.87, 0.87, 0.87], RED = [0.71, 0.02, 0.15];
+function diverging(t) { // t in [-1, 1]
+  t = Math.max(-1, Math.min(1, t));
+  const [from, to, s] = t < 0 ? [WHITE, BLUE, -t] : [WHITE, RED, t];
+  return from.map((c, i) => c + (to[i] - c) * s);
+}
+
+function values() {
+  const m = field.arrs[$("method").value], gt = field.gtArr, q = $("quantity").value, n = gt.length;
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const err = m[i] - gt[i];
+    out[i] = q === "err" ? err : q === "abs" ? Math.abs(err) : q === "rel" ? Math.abs(err) / Math.max(Math.abs(gt[i]), 0.5 * field.voxel)
+      : q === "sdf" ? m[i] : gt[i];
+  }
+  return out;
+}
+
+function regionMask(i) {
+  const g = field.gtArr[i], r = $("region").value;
+  return r === "all" || (r === "near" && Math.abs(g) < field.near_band) || (r === "inside" && g < 0) || (r === "outside" && g >= 0);
+}
+
+function render() {
+  if (!field) return;
+  const v = values(), n = v.length, [nx, ny, nz] = field.dims, h = field.voxel;
+  const signed = ["err", "sdf", "gt"].includes($("quantity").value);
+  // auto range: 99th percentile of |value| over the selected region
+  const mags = [];
+  for (let i = 0; i < n; i++) if (regionMask(i)) mags.push(Math.abs(v[i]));
+  mags.sort((x, y) => x - y);
+  const auto = Math.max(mags[Math.floor(0.99 * (mags.length - 1))] ?? 1, 1e-9);
+  const range = auto * 10 ** parseFloat($("range").value);
+  const thr = parseFloat($("thr").value) * range;
+  const axis = parseInt($("cutAxis").value), cutFrac = parseFloat($("cut").value);
+  const ext = [nx, ny, nz].map((d) => d * h / 2);
+  const cut = axis >= 0 ? cutFrac * ext[axis] : Infinity;
+
+  const mat = new THREE.Matrix4(), col = new THREE.Color(), s = parseFloat($("vsize").value) * h;
+  let k = 0;
+  for (let ix = 0, i = 0; ix < nx; ix++) for (let iy = 0; iy < ny; iy++) for (let iz = 0; iz < nz; iz++, i++) {
+    const p = [field.origin[0] + ix * h, field.origin[1] + iy * h, field.origin[2] + iz * h];
+    if (axis >= 0 && p[axis] > cut) continue;
+    if (!regionMask(i) || Math.abs(v[i]) < thr) continue;
+    mat.makeScale(s, s, s).setPosition(p[0], p[1], p[2]);
+    voxels.setMatrixAt(k, mat);
+    const c = diverging(signed ? v[i] / range : 2 * v[i] / range - 1);
+    voxels.setColorAt(k, col.setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace));
+    k++;
+  }
+  voxels.count = k;
+  voxels.instanceMatrix.needsUpdate = true;
+  if (voxels.instanceColor) voxels.instanceColor.needsUpdate = true;
+
+  // color bar + labels
+  const css = (t) => `rgb(${diverging(t).map((x) => Math.round(255 * x)).join(",")})`;
+  $("bar").style.background = `linear-gradient(to right, ${css(-1)}, ${css(0)}, ${css(1)})`;
+  const fmt = (x) => (Math.abs(x) >= 100 || (Math.abs(x) < 0.01 && x !== 0) ? x.toExponential(1) : x.toFixed(3));
+  $("barLo").textContent = fmt(signed ? -range : 0);
+  $("barMid").textContent = fmt(signed ? 0 : range / 2);
+  $("barHi").textContent = fmt(range);
+  $("cutv").textContent = axis >= 0 ? cut.toFixed(2) : "–";
+  $("thrv").textContent = fmt(thr);
+  $("rangev").textContent = "×" + (10 ** parseFloat($("range").value)).toFixed(2);
+  $("vsizev").textContent = parseFloat($("vsize").value).toFixed(2);
+  renderStats();
+}
+
+function renderStats() {
+  const r = $("region").value, st = field.stats[r] ?? {};
+  $("regionName").textContent = `(${$("region").selectedOptions[0].text})`;
+  const pct = (x) => (100 * x).toFixed(1) + "%";
+  const f3 = (x) => (Math.abs(x) < 1e-3 && x !== 0 ? x.toExponential(1) : x.toFixed(3));
+  $("stats").innerHTML = Object.entries(st).map(([k, s]) =>
+    `<tr data-m="${k}" class="${k === $("method").value ? "sel" : ""}"><td>${k}</td><td>${f3(s.mae)}</td><td>${f3(s.rmse)}</td>` +
+    `<td>${f3(s.max)}</td><td>${f3(s.bias)}</td><td>${pct(s.sign_err)}</td><td>${pct(s.lower_bound)}</td>` +
+    `<td>${field.times_ms[k].toFixed(1)}</td></tr>`).join("");
+  for (const tr of $("stats").children) tr.onclick = () => { $("method").value = tr.dataset.m; render(); };
+}
+
+// ---------- UI wiring ----------
+for (const k of Object.keys(PRESETS)) $("preset").add(new Option(k, k));
+$("preset").add(new Option("custom", "custom"));
+function syncLabels() {
+  for (const k of ["a1", "a2", "a3", "e1", "e2", "pad"]) $(k + "v").textContent = parseFloat($(k).value).toFixed(2);
+}
+$("preset").addEventListener("change", () => {
+  const e = PRESETS[$("preset").value];
+  if (!e) return;
+  $("e1").value = e[0]; $("e2").value = e[1];
+  syncLabels(); buildSurface(); compute();
+});
+for (const k of ["a1", "a2", "a3", "e1", "e2", "pad"]) {
+  $(k).addEventListener("input", () => {
+    syncLabels(); buildSurface();
+    if (k.startsWith("e")) $("preset").value = "custom";
+  });
+  $(k).addEventListener("change", compute);
+}
+$("res").addEventListener("change", compute);
+for (const k of ["method", "quantity", "region", "cutAxis"]) $(k).addEventListener("change", render);
+for (const k of ["cut", "thr", "range", "vsize"]) $(k).addEventListener("input", render);
+$("surf").addEventListener("change", () => { if (surface) surface.visible = $("surf").checked; });
+
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+$("preset").value = "rounded box";
+syncLabels();
+buildSurface();
+compute();
+</script>
+</body>
+</html>

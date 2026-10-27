@@ -1,0 +1,6 @@
+[submodule "papers/superflex"]
+	path = papers/superflex
+	url = https://github.com/GabrielTavernini/superflex.git
+[submodule "experiments/04_ptv3_replica/third_party/sonata"]
+	path = experiments/04_ptv3_replica/third_party/sonata
+	url = https://github.com/facebookresearch/sonata.git

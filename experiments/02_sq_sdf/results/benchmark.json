@@ -1,0 +1,457 @@
+{
+ "device": "NVIDIA GeForce RTX 5090",
+ "torch": "2.14.1+cu130",
+ "chunk_pairs": 4194304,
+ "rows": [
+  {
+   "method": "radial",
+   "M": 10,
+   "N": 1000,
+   "pairs": 10000,
+   "fwd_ms": 0.15011499999673106,
+   "fwd_peak_gb": 0.034172928,
+   "fwd_bwd_ms": 0.8174059994416893,
+   "fwd_bwd_peak_gb": 0.068344832
+  },
+  {
+   "method": "gauge_lb",
+   "M": 10,
+   "N": 1000,
+   "pairs": 10000,
+   "fwd_ms": 0.3454389998296392,
+   "fwd_peak_gb": 0.067727872,
+   "fwd_bwd_ms": 1.1105730000053882,
+   "fwd_bwd_peak_gb": 0.06859008
+  },
+  {
+   "method": "taubin",
+   "M": 10,
+   "N": 1000,
+   "pairs": 10000,
+   "fwd_ms": 0.2069869997285423,
+   "fwd_peak_gb": 0.068088832,
+   "fwd_bwd_ms": 0.9555480000926764,
+   "fwd_bwd_peak_gb": 0.06886912
+  },
+  {
+   "method": "newton_radial",
+   "M": 10,
+   "N": 1000,
+   "pairs": 10000,
+   "fwd_ms": 4.99542699981248,
+   "fwd_peak_gb": 0.070386688,
+   "fwd_bwd_ms": 6.035110000084387,
+   "fwd_bwd_peak_gb": 0.07066368
+  },
+  {
+   "method": "newton_grid",
+   "M": 10,
+   "N": 1000,
+   "pairs": 10000,
+   "fwd_ms": 5.848964000506385,
+   "fwd_peak_gb": 0.072612864,
+   "fwd_bwd_ms": 7.016849000137881,
+   "fwd_bwd_peak_gb": 0.072733184
+  },
+  {
+   "method": "radial",
+   "M": 10,
+   "N": 10000,
+   "pairs": 100000,
+   "fwd_ms": 0.1265380005861516,
+   "fwd_peak_gb": 0.073234432,
+   "fwd_bwd_ms": 1.1022660000890028,
+   "fwd_bwd_peak_gb": 0.079341056
+  },
+  {
+   "method": "gauge_lb",
+   "M": 10,
+   "N": 10000,
+   "pairs": 100000,
+   "fwd_ms": 0.2501619992472115,
+   "fwd_peak_gb": 0.073234944,
+   "fwd_bwd_ms": 1.236299000083818,
+   "fwd_bwd_peak_gb": 0.078056448
+  },
+  {
+   "method": "taubin",
+   "M": 10,
+   "N": 10000,
+   "pairs": 100000,
+   "fwd_ms": 0.20618600046873325,
+   "fwd_peak_gb": 0.076835328,
+   "fwd_bwd_ms": 1.1894280005435576,
+   "fwd_bwd_peak_gb": 0.084544512
+  },
+  {
+   "method": "newton_radial",
+   "M": 10,
+   "N": 10000,
+   "pairs": 100000,
+   "fwd_ms": 5.084421999526967,
+   "fwd_peak_gb": 0.100310528,
+   "fwd_bwd_ms": 6.3561209999534185,
+   "fwd_bwd_peak_gb": 0.103015936
+  },
+  {
+   "method": "newton_grid",
+   "M": 10,
+   "N": 10000,
+   "pairs": 100000,
+   "fwd_ms": 5.760721000115154,
+   "fwd_peak_gb": 0.12204032,
+   "fwd_bwd_ms": 7.07274900014454,
+   "fwd_bwd_peak_gb": 0.123240448
+  },
+  {
+   "method": "radial",
+   "M": 10,
+   "N": 100000,
+   "pairs": 1000000,
+   "fwd_ms": 0.20141500044701388,
+   "fwd_peak_gb": 0.129284608,
+   "fwd_bwd_ms": 3.3451540002715774,
+   "fwd_bwd_peak_gb": 0.192815616
+  },
+  {
+   "method": "gauge_lb",
+   "M": 10,
+   "N": 100000,
+   "pairs": 1000000,
+   "fwd_ms": 0.26608200005284743,
+   "fwd_peak_gb": 0.129867776,
+   "fwd_bwd_ms": 4.143221999584057,
+   "fwd_bwd_peak_gb": 0.176229888
+  },
+  {
+   "method": "taubin",
+   "M": 10,
+   "N": 100000,
+   "pairs": 1000000,
+   "fwd_ms": 0.3661189994090819,
+   "fwd_peak_gb": 0.166838272,
+   "fwd_bwd_ms": 3.938109000046097,
+   "fwd_bwd_peak_gb": 0.246955008
+  },
+  {
+   "method": "newton_radial",
+   "M": 10,
+   "N": 100000,
+   "pairs": 1000000,
+   "fwd_ms": 10.439554999720713,
+   "fwd_peak_gb": 0.401669632,
+   "fwd_bwd_ms": 13.671275999513455,
+   "fwd_bwd_peak_gb": 0.429646848
+  },
+  {
+   "method": "newton_grid",
+   "M": 10,
+   "N": 100000,
+   "pairs": 1000000,
+   "fwd_ms": 12.764813999638136,
+   "fwd_peak_gb": 0.618067968,
+   "fwd_bwd_ms": 15.975404000528215,
+   "fwd_bwd_peak_gb": 0.63065088
+  },
+  {
+   "method": "radial",
+   "M": 100,
+   "N": 1000,
+   "pairs": 100000,
+   "fwd_ms": 0.12964500001544366,
+   "fwd_peak_gb": 0.073132544,
+   "fwd_bwd_ms": 0.7347629998548655,
+   "fwd_bwd_peak_gb": 0.079239168
+  },
+  {
+   "method": "gauge_lb",
+   "M": 100,
+   "N": 1000,
+   "pairs": 100000,
+   "fwd_ms": 0.3287859999545617,
+   "fwd_peak_gb": 0.073133056,
+   "fwd_bwd_ms": 1.0692910000216216,
+   "fwd_bwd_peak_gb": 0.08164096
+  },
+  {
+   "method": "taubin",
+   "M": 100,
+   "N": 1000,
+   "pairs": 100000,
+   "fwd_ms": 0.20716699964395957,
+   "fwd_peak_gb": 0.07673344,
+   "fwd_bwd_ms": 1.0188919995925971,
+   "fwd_bwd_peak_gb": 0.085024256
+  },
+  {
+   "method": "newton_radial",
+   "M": 100,
+   "N": 1000,
+   "pairs": 100000,
+   "fwd_ms": 4.967050999766798,
+   "fwd_peak_gb": 0.10080256,
+   "fwd_bwd_ms": 6.384837000041443,
+   "fwd_bwd_peak_gb": 0.103507968
+  },
+  {
+   "method": "newton_grid",
+   "M": 100,
+   "N": 1000,
+   "pairs": 100000,
+   "fwd_ms": 5.7466830003249925,
+   "fwd_peak_gb": 0.122007552,
+   "fwd_bwd_ms": 6.789591999222466,
+   "fwd_bwd_peak_gb": 0.12320768
+  },
+  {
+   "method": "radial",
+   "M": 100,
+   "N": 10000,
+   "pairs": 1000000,
+   "fwd_ms": 0.20374999985506292,
+   "fwd_peak_gb": 0.130152448,
+   "fwd_bwd_ms": 0.9747350004545297,
+   "fwd_bwd_peak_gb": 0.19348992
+  },
+  {
+   "method": "gauge_lb",
+   "M": 100,
+   "N": 10000,
+   "pairs": 1000000,
+   "fwd_ms": 0.2629470000101719,
+   "fwd_peak_gb": 0.13015296,
+   "fwd_bwd_ms": 1.86674800079345,
+   "fwd_bwd_peak_gb": 0.180007936
+  },
+  {
+   "method": "taubin",
+   "M": 100,
+   "N": 10000,
+   "pairs": 1000000,
+   "fwd_ms": 0.33050899946829304,
+   "fwd_peak_gb": 0.167900672,
+   "fwd_bwd_ms": 1.483825999457622,
+   "fwd_bwd_peak_gb": 0.247628288
+  },
+  {
+   "method": "newton_radial",
+   "M": 100,
+   "N": 10000,
+   "pairs": 1000000,
+   "fwd_ms": 10.070137999719009,
+   "fwd_peak_gb": 0.401566208,
+   "fwd_bwd_ms": 11.192873999789299,
+   "fwd_bwd_peak_gb": 0.428572672
+  },
+  {
+   "method": "newton_grid",
+   "M": 100,
+   "N": 10000,
+   "pairs": 1000000,
+   "fwd_ms": 12.83338699977321,
+   "fwd_peak_gb": 0.617063424,
+   "fwd_bwd_ms": 13.53494600061822,
+   "fwd_bwd_peak_gb": 0.629646336
+  },
+  {
+   "method": "radial",
+   "M": 100,
+   "N": 100000,
+   "pairs": 10000000,
+   "fwd_ms": 1.4798780002820422,
+   "fwd_peak_gb": 0.319975936,
+   "fwd_bwd_ms": 8.8240790000782,
+   "fwd_bwd_peak_gb": 0.57584128
+  },
+  {
+   "method": "gauge_lb",
+   "M": 100,
+   "N": 100000,
+   "pairs": 10000000,
+   "fwd_ms": 1.5285640001820866,
+   "fwd_peak_gb": 0.319976448,
+   "fwd_bwd_ms": 8.516054000210715,
+   "fwd_bwd_peak_gb": 0.508639744
+  },
+  {
+   "method": "taubin",
+   "M": 100,
+   "N": 100000,
+   "pairs": 10000000,
+   "fwd_ms": 2.798849999635422,
+   "fwd_peak_gb": 0.470970368,
+   "fwd_bwd_ms": 13.00442300089344,
+   "fwd_bwd_peak_gb": 0.793946624
+  },
+  {
+   "method": "newton_radial",
+   "M": 100,
+   "N": 100000,
+   "pairs": 10000000,
+   "fwd_ms": 117.55164199985302,
+   "fwd_peak_gb": 1.431465984,
+   "fwd_bwd_ms": 126.51453299986315,
+   "fwd_bwd_peak_gb": 1.544726016
+  },
+  {
+   "method": "newton_grid",
+   "M": 100,
+   "N": 100000,
+   "pairs": 10000000,
+   "fwd_ms": 142.5890190002974,
+   "fwd_peak_gb": 2.366873088,
+   "fwd_bwd_ms": 150.67258199997013,
+   "fwd_bwd_peak_gb": 2.417212928
+  },
+  {
+   "method": "radial",
+   "M": 1000,
+   "N": 1000,
+   "pairs": 1000000,
+   "fwd_ms": 0.20737700015160954,
+   "fwd_peak_gb": 0.130108928,
+   "fwd_bwd_ms": 0.9141350001300452,
+   "fwd_bwd_peak_gb": 0.193471488
+  },
+  {
+   "method": "gauge_lb",
+   "M": 1000,
+   "N": 1000,
+   "pairs": 1000000,
+   "fwd_ms": 0.28444899999158224,
+   "fwd_peak_gb": 0.130113024,
+   "fwd_bwd_ms": 1.466972000343958,
+   "fwd_bwd_peak_gb": 0.21768192
+  },
+  {
+   "method": "taubin",
+   "M": 1000,
+   "N": 1000,
+   "pairs": 1000000,
+   "fwd_ms": 0.3141170000162674,
+   "fwd_peak_gb": 0.167853568,
+   "fwd_bwd_ms": 1.2430220003807335,
+   "fwd_bwd_peak_gb": 0.247620608
+  },
+  {
+   "method": "newton_radial",
+   "M": 1000,
+   "N": 1000,
+   "pairs": 1000000,
+   "fwd_ms": 10.210249000010663,
+   "fwd_peak_gb": 0.401519104,
+   "fwd_bwd_ms": 10.984169000039401,
+   "fwd_bwd_peak_gb": 0.428564992
+  },
+  {
+   "method": "newton_grid",
+   "M": 1000,
+   "N": 1000,
+   "pairs": 1000000,
+   "fwd_ms": 12.51400300043315,
+   "fwd_peak_gb": 0.61770752,
+   "fwd_bwd_ms": 13.53513899994141,
+   "fwd_bwd_peak_gb": 0.630290432
+  },
+  {
+   "method": "radial",
+   "M": 1000,
+   "N": 10000,
+   "pairs": 10000000,
+   "fwd_ms": 1.7049600000973442,
+   "fwd_peak_gb": 0.318954496,
+   "fwd_bwd_ms": 7.521004999944125,
+   "fwd_bwd_peak_gb": 0.574903808
+  },
+  {
+   "method": "gauge_lb",
+   "M": 1000,
+   "N": 10000,
+   "pairs": 10000000,
+   "fwd_ms": 1.6853810002430691,
+   "fwd_peak_gb": 0.318958592,
+   "fwd_bwd_ms": 7.981298999766295,
+   "fwd_bwd_peak_gb": 0.54548736
+  },
+  {
+   "method": "taubin",
+   "M": 1000,
+   "N": 10000,
+   "pairs": 10000000,
+   "fwd_ms": 2.677890000086336,
+   "fwd_peak_gb": 0.469942272,
+   "fwd_bwd_ms": 11.859558000651305,
+   "fwd_bwd_peak_gb": 0.793015296
+  },
+  {
+   "method": "newton_radial",
+   "M": 1000,
+   "N": 10000,
+   "pairs": 10000000,
+   "fwd_ms": 117.02015199989546,
+   "fwd_peak_gb": 1.430417408,
+   "fwd_bwd_ms": 123.97967000015342,
+   "fwd_bwd_peak_gb": 1.54376192
+  },
+  {
+   "method": "newton_grid",
+   "M": 1000,
+   "N": 10000,
+   "pairs": 10000000,
+   "fwd_ms": 141.302990999975,
+   "fwd_peak_gb": 2.366545408,
+   "fwd_bwd_ms": 148.5291380004128,
+   "fwd_bwd_peak_gb": 2.416946176
+  },
+  {
+   "method": "radial",
+   "M": 1000,
+   "N": 100000,
+   "pairs": 100000000,
+   "fwd_ms": 16.053470000770176,
+   "fwd_peak_gb": 0.320034304,
+   "fwd_bwd_ms": 78.15422200019384,
+   "fwd_bwd_peak_gb": 0.575983616
+  },
+  {
+   "method": "gauge_lb",
+   "M": 1000,
+   "N": 100000,
+   "pairs": 100000000,
+   "fwd_ms": 17.446896999899764,
+   "fwd_peak_gb": 0.3200384,
+   "fwd_bwd_ms": 80.71869900049933,
+   "fwd_bwd_peak_gb": 0.546567168
+  },
+  {
+   "method": "taubin",
+   "M": 1000,
+   "N": 100000,
+   "pairs": 100000000,
+   "fwd_ms": 28.728191000482184,
+   "fwd_peak_gb": 0.47102208,
+   "fwd_bwd_ms": 118.57344400050351,
+   "fwd_bwd_peak_gb": 0.794095104
+  },
+  {
+   "method": "newton_radial",
+   "M": 1000,
+   "N": 100000,
+   "pairs": 100000000,
+   "fwd_ms": 1233.789216000332,
+   "fwd_peak_gb": 1.431497216,
+   "fwd_bwd_ms": 1293.8357120001456,
+   "fwd_bwd_peak_gb": 1.544841728
+  },
+  {
+   "method": "newton_grid",
+   "M": 1000,
+   "N": 100000,
+   "pairs": 100000000,
+   "fwd_ms": 1459.4042489998174,
+   "fwd_peak_gb": 2.367625216,
+   "fwd_bwd_ms": 1529.9956919998294,
+   "fwd_bwd_peak_gb": 2.418025984
+  }
+ ]
+}

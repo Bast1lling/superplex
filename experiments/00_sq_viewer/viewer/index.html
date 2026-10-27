@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Superquadric Graph</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #15171c; color: #ddd; font: 13px system-ui, sans-serif; overflow: hidden; }
+  .box { position: absolute; background: rgba(30,32,38,.9); padding: 10px 12px; border-radius: 6px; }
+  #panel { top: 12px; left: 12px; line-height: 1.9; }
+  #panel label { margin-right: 8px; }
+  #panel input[type=number] { width: 64px; background: #222; color: #ddd; border: 1px solid #444; }
+  #panel select { background: #222; color: #ddd; border: 1px solid #444; }
+  #panel h4 { margin: 6px 0 0; font-size: 12px; color: #999; font-weight: 600; text-transform: uppercase; }
+  #status { color: #9cf; min-height: 1.2em; }
+  #groups { font-family: ui-monospace, monospace; font-size: 12px; color: #aaa; max-width: 280px; word-wrap: break-word; }
+  #info { bottom: 12px; left: 12px; white-space: pre; font-family: ui-monospace, monospace; display: none; }
+  #help { bottom: 12px; right: 12px; color: #999; font-size: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="panel" class="box">
+  <label>count <input id="n" type="number" value="40" min="1" max="500"></label>
+  <label>seed <input id="seed" type="number" value="0"></label><br>
+  <button id="regen">regenerate</button>
+  <button id="random">random seed</button>
+  <h4>k-set mode</h4>
+  <label title="one blend over all k-set weights"><input type="radio" name="mode" value="blend" checked> blend (one shape)</label><br>
+  <label title="Delaunay-split k > 4 into tetrahedra, blend each"><input type="radio" name="mode" value="simplex"> simplex (tetrahedra)</label><br>
+  <label>resolution <select id="voxel">
+    <option value="0.07">coarse (fast)</option>
+    <option value="0.04" selected>medium</option>
+    <option value="0.025">fine (slow)</option>
+  </select></label>
+  <h4>display</h4>
+  <label><input id="wire" type="checkbox"> wireframe</label>
+  <label><input id="flat" type="checkbox"> flat shading</label><br>
+  <label><input id="graph" type="checkbox" checked> show graph</label>
+  <label><input id="ghost" type="checkbox"> ghost merged sources</label>
+  <h4>graph</h4>
+  <button id="undo">undo</button>
+  <button id="reset">reset</button>
+  <div id="groups"></div>
+  <div id="status"></div>
+</div>
+<div id="info" class="box"></div>
+<div id="help" class="box">
+  click A, then B &rarr; pair A&ndash;B<br>
+  shift+click several, release shift &rarr; k-set<br>
+  click selected / empty space / Esc &rarr; cancel<br>
+  ctrl+z &rarr; undo
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15171c);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 500);
+camera.position.set(12, 10, 14);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(5, 10, 7);
+scene.add(sun);
+
+const sqGroup = new THREE.Group(), mergedGroup = new THREE.Group();
+const graphGroup = new THREE.Group(), linkGroup = new THREE.Group();
+graphGroup.add(linkGroup);
+scene.add(sqGroup, mergedGroup, graphGroup);
+
+const $ = id => document.getElementById(id);
+const mode = () => document.querySelector("input[name=mode]:checked").value;
+let prims = [];        // per node: { mesh, dot, data }
+let merged = [];       // per component: mesh with userData.nodes
+let groups = [];       // k-sets of node ids, [[a, b], [c, d, e], ...]
+let selected = [];     // currently selected node ids
+let mergeToken = 0;
+
+// ---------- materials ----------
+function sqMaterial(color) {
+  return new THREE.MeshStandardMaterial({
+    color, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide,
+    wireframe: $("wire").checked, flatShading: $("flat").checked,
+  });
+}
+const dotGeo = new THREE.SphereGeometry(0.09, 16, 12);
+const hubGeo = new THREE.OctahedronGeometry(0.11);
+const hubMat = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false });
+const groupMat = new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true, opacity: 0.85 });
+const pieceMat = new THREE.LineBasicMaterial({ color: 0xffcc66, depthTest: false, transparent: true, opacity: 0.45 });
+
+// ---------- loading the crowd ----------
+async function loadCrowd() {
+  const data = await (await fetch(`/api/crowd?n=${$("n").value}&seed=${$("seed").value}`)).json();
+  for (const p of prims) { p.mesh.geometry.dispose(); p.mesh.material.dispose(); p.dot.material.dispose(); graphGroup.remove(p.dot); }
+  sqGroup.clear();
+  prims = []; groups = []; selected = [];
+  const index = new THREE.BufferAttribute(new Uint32Array(data.faces), 1);
+  data.primitives.forEach((p, i) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(p.vertices, 3));
+    geo.setIndex(index);
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, sqMaterial(new THREE.Color(...p.color)));
+    mesh.userData.node = i;
+    sqGroup.add(mesh);
+    const dot = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(...p.color), depthTest: false }));
+    dot.position.set(...p.trans);
+    dot.renderOrder = 3;
+    dot.userData.node = i;
+    graphGroup.add(dot);
+    prims.push({ mesh, dot, data: p });
+  });
+  fitCamera();
+  await refreshGraph();
+}
+
+function fitCamera() {
+  const box = new THREE.Box3().setFromObject(sqGroup);
+  const center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).length();
+  controls.target.copy(center);
+  camera.position.copy(center).add(new THREE.Vector3(0.55, 0.45, 0.7).multiplyScalar(size * 0.9));
+  camera.far = size * 10;
+  camera.updateProjectionMatrix();
+}
+
+// ---------- graph drawing ----------
+function addLine(a, b, mat, order) {
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), mat);
+  line.renderOrder = order;
+  linkGroup.add(line);
+}
+
+function drawGraph(pieces = []) {
+  for (const c of linkGroup.children) c.geometry.dispose?.();
+  linkGroup.clear();
+  const pos = i => prims[i].dot.position;
+  // simplex mode: the tetrahedra the k-sets were split into (only differs from the k-set for k > 4)
+  for (const p of pieces) {
+    if (p.length <= 4 && groups.some(g => g.length === p.length && g.every(v => p.includes(v)))) continue;
+    for (let i = 0; i < p.length; i++) for (let j = i + 1; j < p.length; j++) addLine(pos(p[i]), pos(p[j]), pieceMat, 1);
+  }
+  // k-sets: a plain line for pairs, a hyperedge (star around a hub) for k >= 3
+  for (const g of groups) {
+    if (g.length === 2) { addLine(pos(g[0]), pos(g[1]), groupMat, 2); continue; }
+    const hub = new THREE.Vector3();
+    for (const v of g) hub.add(pos(v));
+    hub.divideScalar(g.length);
+    for (const v of g) addLine(hub, pos(v), groupMat, 2);
+    const h = new THREE.Mesh(hubGeo, hubMat);
+    h.position.copy(hub); h.renderOrder = 3;
+    linkGroup.add(h);
+  }
+  $("groups").textContent = groups.length ? groups.map(g => `{${g.join(",")}}`).join(" ") : "no k-sets";
+}
+
+function applyVisibility() {
+  const inComponent = new Set(merged.flatMap(m => m.userData.nodes));
+  const ghost = $("ghost").checked;
+  prims.forEach((p, i) => {
+    const m = p.mesh.material, isSrc = inComponent.has(i);
+    p.mesh.visible = !isSrc || ghost;
+    m.transparent = isSrc && ghost;
+    m.opacity = isSrc && ghost ? 0.15 : 1;
+    m.depthWrite = !(isSrc && ghost);
+    m.wireframe = $("wire").checked;
+    m.flatShading = $("flat").checked;
+    m.needsUpdate = true;
+  });
+  for (const m of merged) {
+    m.material.wireframe = $("wire").checked;
+    m.material.flatShading = $("flat").checked;
+    m.material.needsUpdate = true;
+  }
+  graphGroup.visible = $("graph").checked;
+}
+
+// ---------- merged shapes ----------
+async function refreshGraph() {
+  drawGraph();
+  const token = ++mergeToken;
+  $("status").textContent = groups.length ? "merging…" : "";
+  const t0 = performance.now();
+  const res = await fetch("/api/merge", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ n: +$("n").value, seed: +$("seed").value, groups, mode: mode(), voxel: +$("voxel").value }),
+  });
+  const data = await res.json();
+  if (token !== mergeToken) return;  // a newer request superseded this one
+  for (const m of merged) { m.geometry.dispose(); m.material.dispose(); }
+  mergedGroup.clear(); merged = [];
+  for (const c of data.components) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(c.vertices, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(c.colors, 3));
+    geo.setIndex(new THREE.BufferAttribute(new Uint32Array(c.faces), 1));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.nodes = c.nodes;
+    mergedGroup.add(mesh); merged.push(mesh);
+  }
+  drawGraph(mode() === "simplex" ? data.components.flatMap(c => c.pieces) : []);
+  applyVisibility();
+  setSelected(selected);
+  if (groups.length) $("status").textContent =
+    `${data.components.length} component(s), ${data.components.reduce((s, c) => s + c.pieces.length, 0)} piece(s), ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+}
+
+function addGroup(nodes) {
+  const g = [...new Set(nodes)].sort((a, b) => a - b);
+  if (g.length < 2) return;
+  if (groups.some(h => h.length === g.length && h.every((v, i) => v === g[i]))) { $("status").textContent = `{${g}} exists`; return; }
+  groups.push(g);
+  refreshGraph();
+}
+
+// ---------- selection ----------
+function setSelected(ids) {
+  for (const p of prims) { p.mesh.material.emissive.setHex(0x000000); p.dot.scale.setScalar(1); }
+  selected = ids;
+  for (const id of ids) { prims[id].mesh.material.emissive.setHex(0x444444); prims[id].dot.scale.setScalar(2.2); }
+  if (!ids.length) { $("info").style.display = "none"; return; }
+  const f = a => a.map(v => v.toFixed(2)).join(", ");
+  if (ids.length === 1) {
+    const d = prims[ids[0]].data;
+    $("info").textContent = `#${ids[0]}  ${d.name}   (click another SQ to pair, shift+click to build a k-set)\nscale  (${f(d.scale)})\neps    (${f(d.eps)})\ncenter (${f(d.trans)})`;
+  } else {
+    $("info").textContent = `k-set in progress (k=${ids.length}): {${ids.join(", ")}}\nrelease shift to create it`;
+  }
+  $("info").style.display = "block";
+}
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+function pick(e) {
+  mouse.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const targets = [
+    ...(graphGroup.visible ? prims.map(p => p.dot) : []),
+    ...prims.filter(p => p.mesh.visible).map(p => p.mesh),
+    ...merged,
+  ];
+  const hits = ray.intersectObjects(targets, false);
+  if (!hits.length) return null;
+  // node dots are drawn on top, so they win whenever they are hit at all
+  const hit = hits.find(h => h.object.geometry === dotGeo) ?? hits[0];
+  if (hit.object.userData.node !== undefined) return hit.object.userData.node;
+  // merged shape: pick the component node whose center is closest to the hit point
+  let best = null, bestD = Infinity;
+  for (const i of hit.object.userData.nodes) {
+    const d = prims[i].dot.position.distanceTo(hit.point);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+let down = null;
+renderer.domElement.addEventListener("pointerdown", e => down = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener("pointerup", e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;  // ignore drags
+  const id = pick(e);
+  if (e.shiftKey) {  // build a k-set: toggle membership
+    if (id === null) return;
+    setSelected(selected.includes(id) ? selected.filter(v => v !== id) : [...selected, id]);
+    return;
+  }
+  if (id === null || selected.includes(id)) { setSelected([]); return; }
+  if (!selected.length) { setSelected([id]); return; }
+  const g = [...selected, id];
+  setSelected([]);
+  addGroup(g);
+});
+addEventListener("keyup", e => {
+  if (e.key === "Shift" && selected.length >= 2) { const g = selected; setSelected([]); addGroup(g); }
+});
+
+// ---------- controls ----------
+$("regen").onclick = loadCrowd;
+$("random").onclick = () => { $("seed").value = Math.floor(Math.random() * 1e6); loadCrowd(); };
+for (const id of ["wire", "flat", "graph", "ghost"]) $(id).onchange = applyVisibility;
+for (const r of document.querySelectorAll("input[name=mode]")) r.onchange = refreshGraph;
+$("voxel").onchange = refreshGraph;
+$("undo").onclick = () => { if (groups.pop()) refreshGraph(); };
+$("reset").onclick = () => { groups = []; setSelected([]); refreshGraph(); };
+addEventListener("keydown", e => {
+  if (e.key === "Escape") setSelected([]);
+  if (e.key === "z" && (e.ctrlKey || e.metaKey)) $("undo").click();
+});
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+loadCrowd();
+</script>
+</body>
+</html>

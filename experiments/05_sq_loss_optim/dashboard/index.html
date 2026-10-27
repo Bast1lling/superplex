@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQ Loss Runs</title>
+<style>
+  :root { --bg: #15171c; --panel: #1d2027; --panel2: #23272f; --fg: #e4e6eb; --muted: #9aa0ab; --line: #30343e; --accent: #6aa8ff; --danger: #ef6a6a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; }
+  .app { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: 100%; }
+  aside { border-right: 1px solid var(--line); padding: 14px; overflow-y: auto; display: grid; gap: 16px; align-content: start; }
+  main { overflow-y: auto; padding: 16px 20px 40px; display: grid; gap: 22px; align-content: start; }
+  h1 { font-size: 15px; margin: 0; }
+  h2 { font-size: 12px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+  button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.icon { padding: 0 5px; line-height: 18px; color: var(--muted); background: transparent; border-color: transparent; }
+  button.icon:hover { color: var(--fg); border-color: var(--line); }
+  button.danger:hover { color: var(--danger); border-color: var(--danger); }
+  select, input[type=text], input[type=number] { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; font: inherit; }
+  input[type=number] { width: 90px; }
+  .bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .group { border: 1px solid var(--line); border-radius: 6px; padding: 4px; margin-bottom: 6px; }
+  .group-head { display: flex; gap: 6px; align-items: center; padding: 2px 4px; font-weight: 600; }
+  .group-head .sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  .group-head .gname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .run { display: grid; grid-template-columns: 14px 10px minmax(0, 1fr) auto; gap: 7px; align-items: center; padding: 3px 4px; border-radius: 4px; }
+  .run:hover { background: var(--panel); }
+  .run .sw { width: 10px; height: 10px; border-radius: 2px; }
+  .run .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .run .acts { display: flex; gap: 2px; }
+  .run .meta { grid-column: 3 / 5; color: var(--muted); font-size: 11px; display: flex; gap: 6px; align-items: center; }
+  .run .meta input { width: 110px; padding: 1px 4px; font-size: 11px; }
+  .controls { display: grid; gap: 8px; color: var(--muted); }
+  .controls label { display: flex; gap: 6px; align-items: center; }
+  .controls input[type=range] { flex: 1; accent-color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 11px; padding: 1px 6px; border-radius: 999px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; cursor: zoom-in; }
+  .card:hover { border-color: #444a57; }
+  .card .head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 2px; align-items: start; }
+  .card .title { font-weight: 600; }
+  .card .val { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; white-space: pre; }
+  .card .note { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+  .card .limits { color: var(--accent); font-size: 11px; }
+  svg { width: 100%; display: block; overflow: visible; }
+  svg text { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 4px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  .muted { color: var(--muted); }
+  #modal { position: fixed; inset: 0; background: rgba(8, 9, 12, 0.72); display: none; padding: 32px; z-index: 10; }
+  #modal.open { display: grid; }
+  .modal-box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; grid-template-rows: auto auto 1fr; gap: 10px; min-height: 0; }
+  .modal-box .head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+  .modal-box .head b { font-size: 15px; }
+  .modal-box .axis { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; color: var(--muted); }
+  .modal-box .axis label { display: flex; gap: 6px; align-items: center; }
+  #modalChart { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; }
+  #modalChart .val { color: var(--muted); font-variant-numeric: tabular-nums; white-space: pre; font-size: 12px; overflow-y: auto; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line); padding: 6px 12px; border-radius: 6px; display: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div><h1>SQ loss optimization</h1><div class="muted" id="status">loading…</div></div>
+    <div>
+      <h2>Runs</h2>
+      <div class="bar" style="margin-bottom:8px">
+        <button id="all">select all</button><button id="none">deselect all</button><button id="latest">latest only</button>
+      </div>
+      <div class="controls" style="margin-bottom:8px">
+        <label>group by <select id="groupBy"></select></label>
+        <label><input id="aggregate" type="checkbox"> plot groups as mean ± range</label>
+      </div>
+      <div id="runs"></div>
+    </div>
+    <div class="controls">
+      <h2>Display</h2>
+      <label>smoothing <input id="smooth" type="range" min="0" max="0.98" step="0.02" value="0.6"><span id="smoothVal">0.60</span></label>
+      <label><input id="logy" type="checkbox"> log scale for losses</label>
+      <label><input id="auto" type="checkbox" checked> auto-refresh (5 s)</label>
+    </div>
+    <div>
+      <h2>Hidden plots</h2>
+      <div class="chips" id="hidden"><span class="muted">none</span></div>
+    </div>
+  </aside>
+  <main>
+    <section><h2>Config differences</h2><div class="tablewrap" id="configDiff"></div></section>
+    <div id="sections"></div>
+  </main>
+</div>
+
+<div id="modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="head"><b id="modalTitle"></b><div class="bar"><button id="modalReset">reset axes</button><button id="modalClose">close (Esc)</button></div></div>
+    <div class="axis">
+      <label>y min <input id="ymin" type="number" step="any" placeholder="auto"></label>
+      <label>y max <input id="ymax" type="number" step="any" placeholder="auto"></label>
+      <label>x min <input id="xmin" type="number" step="any" placeholder="auto"></label>
+      <label>x max <input id="xmax" type="number" step="any" placeholder="auto"></label>
+      <label><input id="mlog" type="checkbox"> log y</label>
+      <label>smoothing <input id="msmooth" type="number" min="0" max="0.99" step="0.05" placeholder="global"></label>
+    </div>
+    <div id="modalChart"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const PROJECT = "sq_loss_optim";
+const WRITE_TOKEN = new URLSearchParams(location.search).get("write_token") || "superplex-local";  // see code/dashboard.py
+const SECTIONS = [
+  ["Loss", ["loss/total", "loss/ce", "loss/hinge", "loss/reverse_chamfer"]],
+  ["Evaluation (all points)", ["eval/accuracy", "eval/mean_iou", "eval/uncovered", "eval/swallowed", "eval/d_assigned_median", "eval/purity_active"]],
+  ["Empty space", ["eval/surface_in_air", "eval/surface_gap_mean"]],
+  ["Superquadrics", ["eval/active_sqs", "eval/instances_with_sq", "eval/sqs_per_covered_instance", "eval/existence_mean"]],
+  ["Batch & timing", ["batch/q_true_mean", "batch/uncovered", "time/step_ms", "lr/translation"]],
+];
+const NOTES = {
+  "loss/ce": "voted-label cross-entropy", "loss/hinge": "swallow hinge, in units of delta",
+  "eval/accuracy": "argmax q_p == GT instance", "eval/mean_iou": "mean over GT instances",
+  "eval/uncovered": "share of points with total claim < 0.5", "eval/swallowed": "covered points deeper than delta in their SQs",
+  "eval/d_assigned_median": "ownership-weighted SDF of covered points (m)", "eval/purity_active": "max vote share of active SQs",
+  "eval/active_sqs": "existence > 0.5 and owning >= 10 points",
+  "loss/reverse_chamfer": "union-surface samples farther than delta from the scene, in units of delta",
+  "eval/surface_in_air": "share of active union-surface samples > delta from any scene point",
+  "eval/surface_gap_mean": "mean distance of active union-surface samples to the scene (m)", "eval/instances_with_sq": "share of GT instances with >= 1 active SQ",
+};
+const COLORS = ["#6aa8ff", "#ff8a5c", "#5fd39a", "#e46bd0", "#f2c94c", "#56cfe1", "#b39ddb", "#ef5350", "#a5d6a7", "#ffb74d"];
+const $ = (id) => document.getElementById(id);
+
+// ---------- persistent UI state ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("sqdash:" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("sqdash:" + k, JSON.stringify(v)); } catch {} },
+};
+const state = {
+  runs: [], configs: {}, cache: {}, allMetrics: [],
+  selected: new Set(store.get("selected", [])),
+  hidden: new Set(store.get("hidden", [])),
+  manualGroup: store.get("manualGroup", {}),      // run id -> group name
+  axes: store.get("axes", {}),                    // metric -> {ymin, ymax, xmin, xmax, log, smooth}
+  groupBy: store.get("groupBy", "none"),
+  modalMetric: null,
+};
+const save = () => {
+  store.set("selected", [...state.selected]); store.set("hidden", [...state.hidden]);
+  store.set("manualGroup", state.manualGroup); store.set("axes", state.axes); store.set("groupBy", state.groupBy);
+};
+
+async function api(name, payload = {}, write = false) {
+  const headers = { "Content-Type": "application/json" };
+  if (write) headers["x-trackio-write-token"] = WRITE_TOKEN;
+  const r = await fetch(`/api/${name}`, { method: "POST", headers, body: JSON.stringify(payload) });
+  const j = await r.json();
+  if (!r.ok || j.error) throw new Error(j.error || j.detail || name);
+  return j.data;
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), 3000); }
+
+// ---------- grouping ----------
+function flatten(obj, prefix = "", out = {}) {
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (k.startsWith("_")) continue;
+    if (v && typeof v === "object" && !Array.isArray(v)) flatten(v, prefix + k + ".", out);
+    else out[prefix + k] = JSON.stringify(v);
+  }
+  return out;
+}
+const flatConfig = (run) => flatten(state.configs[run.id]);
+function differingKeys(runs) {
+  const flat = runs.map(flatConfig), keys = [...new Set(flat.flatMap(Object.keys))].sort();
+  return keys.filter((k) => new Set(flat.map((f) => f[k])).size > 1);
+}
+function groupOf(run) {
+  if (state.groupBy === "none") return null;
+  if (state.groupBy === "manual") return state.manualGroup[run.id] || "(ungrouped)";
+  return `${state.groupBy} = ${flatConfig(run)[state.groupBy] ?? "–"}`;
+}
+function groups() {
+  const map = new Map();
+  for (const r of state.runs) { const g = groupOf(r) ?? "all runs"; if (!map.has(g)) map.set(g, []); map.get(g).push(r); }
+  return map;
+}
+function colorOf(run) {
+  if (state.groupBy !== "none") { const names = [...groups().keys()]; return COLORS[names.indexOf(groupOf(run)) % COLORS.length]; }
+  return COLORS[state.runs.findIndex((r) => r.id === run.id) % COLORS.length];
+}
+function renderGroupBy() {
+  const opts = ["none", "manual", ...differingKeys(state.runs)];
+  if (!opts.includes(state.groupBy)) state.groupBy = "none";
+  $("groupBy").innerHTML = opts.map((o) => `<option value="${o}" ${o === state.groupBy ? "selected" : ""}>${o === "none" ? "— none —" : o === "manual" ? "manual groups" : o}</option>`).join("");
+}
+
+// ---------- run list ----------
+function renderRuns() {
+  renderGroupBy();
+  const wrap = $("runs");
+  wrap.innerHTML = "";
+  for (const [gname, runs] of groups()) {
+    const box = document.createElement("div");
+    box.className = state.groupBy === "none" ? "" : "group";
+    if (state.groupBy !== "none") {
+      const allOn = runs.every((r) => state.selected.has(r.id));
+      const head = document.createElement("div");
+      head.className = "group-head";
+      head.innerHTML = `<input type="checkbox" ${allOn ? "checked" : ""}><span class="sw" style="background:${colorOf(runs[0])}"></span><span class="gname" title="${gname}">${gname}</span><span class="muted">${runs.length}</span>`;
+      head.querySelector("input").onchange = (e) => { runs.forEach((r) => (e.target.checked ? state.selected.add(r.id) : state.selected.delete(r.id))); save(); renderRuns(); render(); };
+      box.appendChild(head);
+    }
+    for (const run of runs) {
+      const el = document.createElement("div");
+      el.className = "run";
+      el.innerHTML = `<input type="checkbox" ${state.selected.has(run.id) ? "checked" : ""}><span class="sw" style="background:${colorOf(run)}"></span>` +
+        `<span class="nm" title="${run.name}">${run.name}</span>` +
+        `<span class="acts"><button class="icon danger" title="delete run">✕</button></span>` +
+        `<span class="meta">${new Date(run.created_at).toLocaleString()}` +
+        (state.groupBy === "manual" ? `<input type="text" placeholder="group" value="${state.manualGroup[run.id] || ""}">` : "") + `</span>`;
+      el.querySelector("input[type=checkbox]").onchange = (e) => { e.target.checked ? state.selected.add(run.id) : state.selected.delete(run.id); save(); render(); };
+      el.querySelector(".danger").onclick = () => deleteRun(run, el);
+      const gi = el.querySelector(".meta input");
+      if (gi) gi.onchange = () => { const v = gi.value.trim(); v ? (state.manualGroup[run.id] = v) : delete state.manualGroup[run.id]; save(); renderRuns(); render(); };
+      box.appendChild(el);
+    }
+    wrap.appendChild(box);
+  }
+}
+
+async function deleteRun(run, el) {
+  const btn = el.querySelector(".danger");
+  if (btn.dataset.armed !== "1") { btn.dataset.armed = "1"; btn.textContent = "delete?"; setTimeout(() => { btn.dataset.armed = ""; btn.textContent = "✕"; }, 3000); return; }
+  try {
+    await api("delete_run", { project: PROJECT, run: run.name, run_id: run.id }, true);
+    state.selected.delete(run.id); delete state.manualGroup[run.id]; save();
+    toast(`Deleted ${run.name} from trackio (files in results/runs stay).`);
+    await refresh();
+  } catch (e) { toast("Delete failed: " + e.message); }
+}
+
+// ---------- config diff ----------
+function renderConfigDiff(runs) {
+  if (!runs.length) { $("configDiff").innerHTML = '<span class="muted">No runs selected.</span>'; return; }
+  const flat = runs.map(flatConfig);
+  const pinned = ["data.scene", "loss.sdf", "loss.membership.temperature", "loss.vote.stop_gradient", "optim.steps"];
+  const keys = [...new Set(flat.flatMap(Object.keys))].sort().filter((k) => new Set(flat.map((f) => f[k])).size > 1 || pinned.includes(k));
+  $("configDiff").innerHTML = `<table><tr><th>key</th>${runs.map((r) => `<th style="color:${colorOf(r)}">${r.name}</th>`).join("")}</tr>` +
+    keys.map((k) => `<tr><td>${k}</td>${flat.map((f) => `<td>${f[k] ?? "–"}</td>`).join("")}</tr>`).join("") + "</table>";
+}
+
+// ---------- data ----------
+function ema(rows, a) {
+  if (!a) return rows;
+  let s = null;
+  return rows.map((r) => { s = s === null ? r.value : a * s + (1 - a) * r.value; return { step: r.step, value: s }; });
+}
+const fmt = (v) => (Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(3) : Math.abs(v) >= 1e-3 || v === 0 ? v.toFixed(4) : v.toExponential(2));
+
+async function metricRows(run, metric) {
+  const key = run.id + "|" + metric;
+  if (!state.cache[key] || state.cache[key].stale) {
+    state.cache[key] = { rows: await api("get_metric_values", { project: PROJECT, run: run.name, run_id: run.id, metric_name: metric }) };
+  }
+  return state.cache[key].rows.filter((r) => typeof r.value === "number" && Number.isFinite(r.value));
+}
+
+async function seriesFor(metric, runs) {
+  const ax = state.axes[metric] || {};
+  const a = ax.smooth !== undefined && ax.smooth !== null && ax.smooth !== "" ? +ax.smooth : (metric.startsWith("eval/") ? 0 : parseFloat($("smooth").value));
+  const per = await Promise.all(runs.map(async (r) => ({ name: r.name, color: colorOf(r), group: groupOf(r), rows: ema(await metricRows(r, metric), a) })));
+  if (!$("aggregate").checked || state.groupBy === "none") return per;
+  const byGroup = new Map();
+  for (const s of per) { if (!byGroup.has(s.group)) byGroup.set(s.group, []); byGroup.get(s.group).push(s); }
+  return [...byGroup.entries()].map(([g, list]) => {
+    const steps = [...new Set(list.flatMap((s) => s.rows.map((r) => r.step)))].sort((x, y) => x - y);
+    const lookup = list.map((s) => new Map(s.rows.map((r) => [r.step, r.value])));
+    const rows = [], lo = [], hi = [];
+    for (const st of steps) {
+      const vals = lookup.map((m) => m.get(st)).filter((v) => v !== undefined);
+      if (!vals.length) continue;
+      rows.push({ step: st, value: vals.reduce((p, c) => p + c, 0) / vals.length });
+      lo.push(Math.min(...vals)); hi.push(Math.max(...vals));
+    }
+    return { name: `${g} (n=${list.length})`, color: list[0].color, rows, lo, hi };
+  });
+}
+
+// ---------- chart ----------
+function chartSvg(metric, series, opts) {
+  const { W, H, logy } = opts, L = 50, R = 10, T = 8, B = 22;
+  const ax = state.axes[metric] || {};
+  const tf = (v) => (logy ? Math.log10(Math.max(v, 1e-8)) : v);
+  const pts = series.flatMap((s) => s.rows.map((r) => [r.step, tf(r.value)]));
+  if (!pts.length) return { svg: `<div class="muted">no data</div>` };
+  let x0 = ax.xmin ?? Math.min(...pts.map((p) => p[0])), x1 = ax.xmax ?? Math.max(...pts.map((p) => p[0]));
+  const inX = pts.filter((p) => p[0] >= x0 && p[0] <= x1);
+  let y0 = ax.ymin !== undefined && ax.ymin !== null ? tf(ax.ymin) : Math.min(...inX.map((p) => p[1]));
+  let y1 = ax.ymax !== undefined && ax.ymax !== null ? tf(ax.ymax) : Math.max(...inX.map((p) => p[1]));
+  if (x1 <= x0) x1 = x0 + 1;
+  if (y1 <= y0) { y0 -= 0.5; y1 += 0.5; }
+  if (ax.ymin == null && ax.ymax == null) { const pad = (y1 - y0) * 0.05; y0 -= pad; y1 += pad; }
+  const sx = (x) => L + (x - x0) / (x1 - x0) * (W - L - R), sy = (y) => T + (1 - (y - y0) / (y1 - y0)) * (H - T - B);
+  const label = (y) => (logy ? fmt(10 ** y) : fmt(y));
+  const nT = H > 300 ? 6 : 3;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="height:${H}px" preserveAspectRatio="none"><defs><clipPath id="c-${opts.id}"><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}"/></clipPath></defs>`;
+  for (let i = 0; i < nT; i++) { const t = y0 + (i / (nT - 1)) * (y1 - y0); svg += `<line x1="${L}" x2="${W - R}" y1="${sy(t)}" y2="${sy(t)}" stroke="var(--line)"/><text x="${L - 4}" y="${sy(t) + 3}" text-anchor="end">${label(t)}</text>`; }
+  for (let i = 0; i < nT; i++) { const t = x0 + (i / (nT - 1)) * (x1 - x0); svg += `<text x="${sx(t)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === nT - 1 ? "end" : "middle"}">${Math.round(t)}</text>`; }
+  svg += `<g clip-path="url(#c-${opts.id})">`;
+  for (const s of series) {
+    if (!s.rows.length) continue;
+    if (s.lo) {
+      const up = s.rows.map((r, i) => `${sx(r.step).toFixed(1)},${sy(tf(s.hi[i])).toFixed(1)}`);
+      const dn = s.rows.map((r, i) => `${sx(r.step).toFixed(1)},${sy(tf(s.lo[i])).toFixed(1)}`).reverse();
+      svg += `<polygon points="${up.concat(dn).join(" ")}" fill="${s.color}" fill-opacity="0.18" stroke="none"/>`;
+    }
+    const d = s.rows.map((r, i) => `${i ? "L" : "M"}${sx(r.step).toFixed(1)},${sy(tf(r.value)).toFixed(1)}`).join("");
+    svg += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
+  }
+  svg += `</g><line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/></svg>`;
+  return { svg, sx, x0, x1, W, L, R };
+}
+
+function bindHover(container, series, geo, valEl, restText) {
+  const el = container.querySelector("svg");
+  if (!el || !geo.sx) return;
+  const cur = el.querySelector(".cursor");
+  el.addEventListener("mousemove", (e) => {
+    const r = el.getBoundingClientRect(), x = geo.x0 + ((e.clientX - r.left) / r.width * geo.W - geo.L) / (geo.W - geo.L - geo.R) * (geo.x1 - geo.x0);
+    cur.setAttribute("x1", geo.sx(x)); cur.setAttribute("x2", geo.sx(x)); cur.setAttribute("visibility", "visible");
+    valEl.textContent = `step ${Math.round(x)}\n` + series.filter((s) => s.rows.length).map((s) => {
+      const near = s.rows.reduce((a, b) => (Math.abs(b.step - x) < Math.abs(a.step - x) ? b : a));
+      return `${s.name}: ${fmt(near.value)}`;
+    }).join("\n");
+  });
+  el.addEventListener("mouseleave", () => { cur.setAttribute("visibility", "hidden"); valEl.textContent = restText; });
+}
+
+const isLog = (metric) => { const ax = state.axes[metric] || {}; return ax.log ?? ($("logy").checked && metric.startsWith("loss/")); };
+const limitsText = (metric) => { const ax = state.axes[metric] || {}; const parts = ["ymin", "ymax", "xmin", "xmax"].filter((k) => ax[k] != null).map((k) => `${k} ${ax[k]}`); return parts.join(" · "); };
+
+function card(metric, series) {
+  const c = document.createElement("div");
+  c.className = "card";
+  const geo = chartSvg(metric, series, { W: 360, H: 170, logy: isLog(metric), id: metric.replace(/\W/g, "_") });
+  const last = series.filter((s) => s.rows.length).map((s) => fmt(s.rows[s.rows.length - 1].value)).join("  ");
+  const lim = limitsText(metric);
+  c.innerHTML = `<div class="head"><span class="title">${metric}</span><span style="display:flex;gap:4px;align-items:start"><span class="val">${last}</span><button class="icon" title="hide plot">✕</button></span></div>` +
+    (NOTES[metric] ? `<div class="note">${NOTES[metric]}</div>` : "") + (lim ? `<div class="limits">${lim}</div>` : "") + geo.svg;
+  c.querySelector("button.icon").onclick = (e) => { e.stopPropagation(); state.hidden.add(metric); save(); render(); };
+  c.onclick = () => openModal(metric);
+  bindHover(c, series, geo, c.querySelector(".val"), last);
+  return c;
+}
+
+// ---------- modal ----------
+async function drawModal() {
+  const metric = state.modalMetric;
+  if (!metric) return;
+  const runs = state.runs.filter((r) => state.selected.has(r.id));
+  const series = await seriesFor(metric, runs);
+  const box = $("modalChart");
+  const W = Math.max(500, box.clientWidth - 280), H = Math.max(300, box.clientHeight - 10);
+  const geo = chartSvg(metric, series, { W, H, logy: isLog(metric), id: "modal" });
+  const last = series.filter((s) => s.rows.length).map((s) => `${s.name}: ${fmt(s.rows[s.rows.length - 1].value)}`).join("\n");
+  box.innerHTML = `<div>${geo.svg}</div><div class="val">${last}</div>`;
+  bindHover(box, series, geo, box.querySelector(".val"), last);
+}
+function openModal(metric) {
+  state.modalMetric = metric;
+  const ax = state.axes[metric] || {};
+  $("modalTitle").textContent = metric + (NOTES[metric] ? ` — ${NOTES[metric]}` : "");
+  for (const k of ["ymin", "ymax", "xmin", "xmax"]) $(k).value = ax[k] ?? "";
+  $("msmooth").value = ax.smooth ?? "";
+  $("mlog").checked = isLog(metric);
+  $("modal").classList.add("open");
+  drawModal();
+}
+function closeModal() { state.modalMetric = null; $("modal").classList.remove("open"); render(); }
+function readAxes() {
+  const m = state.modalMetric, ax = {};
+  for (const k of ["ymin", "ymax", "xmin", "xmax"]) { const v = $(k).value; if (v !== "") ax[k] = parseFloat(v); }
+  if ($("msmooth").value !== "") ax.smooth = parseFloat($("msmooth").value);
+  ax.log = $("mlog").checked;
+  state.axes[m] = ax; save(); drawModal();
+}
+for (const k of ["ymin", "ymax", "xmin", "xmax", "msmooth"]) $(k).addEventListener("input", readAxes);
+$("mlog").addEventListener("change", readAxes);
+$("modalReset").onclick = () => { delete state.axes[state.modalMetric]; save(); openModal(state.modalMetric); };
+$("modalClose").onclick = closeModal;
+$("modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeModal(); });
+addEventListener("keydown", (e) => { if (e.key === "Escape" && state.modalMetric) closeModal(); });
+
+// ---------- render ----------
+function renderHidden() {
+  const h = [...state.hidden];
+  $("hidden").innerHTML = h.length ? "" : '<span class="muted">none</span>';
+  for (const m of h) {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = m + " ↺"; b.title = "show again";
+    b.onclick = () => { state.hidden.delete(m); save(); render(); };
+    $("hidden").appendChild(b);
+  }
+}
+
+let rendering = false;
+async function render() {
+  if (rendering) return;
+  rendering = true;
+  try {
+    const runs = state.runs.filter((r) => state.selected.has(r.id));
+    renderConfigDiff(runs);
+    renderHidden();
+    const known = new Set(SECTIONS.flatMap((s) => s[1]));
+    const other = state.allMetrics.filter((m) => !known.has(m));
+    const sections = other.length ? [...SECTIONS, ["Other", other]] : SECTIONS;
+    const frag = document.createDocumentFragment();
+    for (const [title, metrics] of sections) {
+      const visible = metrics.filter((m) => !state.hidden.has(m));
+      if (!visible.length) continue;
+      const sec = document.createElement("section");
+      sec.innerHTML = `<h2>${title}</h2>`;
+      const grid = document.createElement("div");
+      grid.className = "grid";
+      const cards = await Promise.all(visible.map(async (m) => card(m, await seriesFor(m, runs))));
+      grid.append(...cards);
+      sec.appendChild(grid);
+      frag.appendChild(sec);
+    }
+    $("sections").replaceChildren(frag);
+    if (state.modalMetric) await drawModal();
+    $("status").textContent = `${state.runs.length} runs · ${runs.length} selected · updated ${new Date().toLocaleTimeString()}`;
+  } finally { rendering = false; }
+}
+
+async function refresh(first = false) {
+  state.runs = (await api("get_runs_for_project", { project: PROJECT })).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  state.configs = await api("get_run_configs", { project: PROJECT });
+  const ids = new Set(state.runs.map((r) => r.id));
+  state.selected = new Set([...state.selected].filter((id) => ids.has(id)));
+  if (first && !state.selected.size && state.runs.length) state.selected.add(state.runs[state.runs.length - 1].id);
+  const metricLists = await Promise.all(state.runs.map((r) => api("get_metrics_for_run", { project: PROJECT, run: r.name, run_id: r.id })));
+  state.allMetrics = [...new Set(metricLists.flat())].sort();
+  for (const k in state.cache) state.cache[k].stale = true;
+  save(); renderRuns(); await render();
+}
+
+$("all").onclick = () => { state.runs.forEach((r) => state.selected.add(r.id)); save(); renderRuns(); render(); };
+$("none").onclick = () => { state.selected.clear(); save(); renderRuns(); render(); };
+$("latest").onclick = () => { state.selected = new Set(state.runs.length ? [state.runs[state.runs.length - 1].id] : []); save(); renderRuns(); render(); };
+$("groupBy").onchange = () => { state.groupBy = $("groupBy").value; save(); renderRuns(); render(); };
+$("aggregate").onchange = render;
+$("smooth").oninput = () => { $("smoothVal").textContent = parseFloat($("smooth").value).toFixed(2); render(); };
+$("logy").onchange = render;
+addEventListener("resize", () => { if (state.modalMetric) drawModal(); });
+setInterval(() => { if ($("auto").checked && !state.modalMetric) refresh().catch(console.error); }, 5000);
+refresh(true).catch((e) => { $("status").textContent = "error: " + e.message; });
+</script>
+</body>
+</html>

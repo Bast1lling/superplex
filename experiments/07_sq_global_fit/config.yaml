@@ -1,0 +1,89 @@
+# Experiment 07: global top-down SQ fit to the scene point cloud (no instance labels in the optimization).
+# Start: 1 SQ for the whole scene; grow by verified splits (scheme of experiment 06, room0_split_fair_gain5mm).
+# GT instances are only used for diagnostics. Units: meters.
+
+seed: 0
+
+data:
+  scene: room_0
+  points_dir: /home/sebastian/Documents/Uni/Thesis/data/replica_v1_points
+  tokens_dir: /home/sebastian/Documents/Uni/Thesis/data/replica_v1_sonata/stage4  # only for the frame (R, t) of the version
+  version: 0
+  drop_unlabeled: true        # keeps the diagnostics well defined (1-2% of points)
+
+pool:
+  max_sqs: 2048               # slots; alive slots are the current SQ set
+
+init:
+  method: kmeans              # kmeans: n_sqs k-means clusters | dbscan6d: one SQ per DBSCAN cluster on [x, w * n]
+  dbscan:
+    eps: 0.02
+    normal_weight: 0.143      # eps = 2 cm <-> 8 deg normal difference
+    min_pts: 5                # core point: >= min_pts neighbors within eps (incl. itself); 1 cm cloud: median 11
+    min_cluster: 500          # clusters with fewer points get no initial SQ (left to the residual splits)
+  n_sqs: 1                    # kmeans: initial SQs, box fit per cluster
+  kmeans_iters: 25
+  quantile: 0.98              # box fit: semi-axes = quantile of |projection| + margin
+  margin: 0.0
+  eps: [1.0, 1.0]
+  kmeans_max_points: 20000    # subsample for the 2-means of a split
+
+parametrization:
+  scale: {type: exp, min: 0.005, max: 10.0}
+  eps: {type: sigmoid, min: 0.1, max: 1.9}
+  rotation: quaternion
+
+sampling:
+  points_per_step: 32768
+  scheme: uniform             # no labels to balance by
+
+loss:
+  sdf: radial
+  forward:                    # points -> nearest SQ (hard min over all alive SQs)
+    mode: union_abs           # union_abs: |min_j d_j| | enclosure: relu(min_j d_j) | min_abs: min_j |d_j|
+    weight: 1.0
+  backward:                   # union surface samples -> nearest scene point; mean over SQs and samples
+    weight: 1.0
+    samples_per_sq: 64
+    union_sharpness: 0.01     # a sample counts if it is outside all other SQs (no grad)
+    delta: 0.0
+    grid_res: 0.01            # scene unsigned distance grid (EDT), trilinear lookup
+    grid_pad: 0.5
+
+split:
+  enabled: true
+  start: 200                  # checks at start, start + every, ..., stop (+ one more to verify the last proposals)
+  every: 200
+  stop: 3000
+  tolerance: 0.005            # local: SQ j is a candidate if the mean forward error of its owned points > tolerance;
+                              # a split is kept if the loss on the parent's region (points it owned at the proposal:
+                              # mean forward + mean backward of the involved SQs) is lower by more than tolerance
+                              # than in the shadow copy trained without the split
+  proposal: halve             # halve: 2-means of the owned points, box fit per half
+                              # residual: parent untouched, new SQ on the largest connected cluster of its owned points
+                              # with forward error > residual_threshold (judged on that cluster)
+  residual_threshold: 0.02
+  cluster_voxel: 0.05         # connectivity of the residual cluster (26-neighborhood of voxels)
+  max_clusters_per_parent: 8  # residual: new SQs per parent and check (largest clusters first)
+  min_points: 20              # owned points needed to split
+  kmeans_iters: 15            # 2-means of the owned points, box fit per half
+  verify: true
+  retry_cooldown: 2           # checks before a rejected SQ may be proposed again
+
+optim:
+  optimizer: adam
+  steps: 4000
+  schedule: cosine
+  lr:
+    translation: 0.01
+    log_scale: 0.01
+    eps: 0.02
+    rotation: 0.01
+
+logging:
+  snapshot_every: 200
+  eval_every: 250
+
+metrics:
+  air_delta: 0.05             # union surface sample "in air" if > this from the scene
+  size_bins: [1000, 5000, 20000]  # GT instance point counts (diagnostics)

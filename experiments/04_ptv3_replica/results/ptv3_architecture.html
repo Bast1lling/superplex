@@ -1,0 +1,467 @@
+<title>PTv3 Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky step rail on the left, one section per pipeline step on the right; each section = text + one live figure. */
+:root {
+  --bg: #f2f4f3;
+  --surface: #ffffff;
+  --ink: #1b2422;
+  --muted: #5d6b67;
+  --line: #d5dcd9;
+  --accent: #0e7a6d;      /* teal: attention / active things */
+  --accent-soft: #d6efe9;
+  --warm: #c46a1b;        /* amber: pooling / coarse things */
+  --warm-soft: #f6e4d2;
+  --cell-empty: #e4e9e7;
+  --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121816; --surface: #1a2220; --ink: #e3ebe8; --muted: #93a39e; --line: #2c3834;
+    --accent: #3cc2ad; --accent-soft: #173a34; --warm: #e8954a; --warm-soft: #3a2a1a; --cell-empty: #222c29;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121816; --surface: #1a2220; --ink: #e3ebe8; --muted: #93a39e; --line: #2c3834;
+  --accent: #3cc2ad; --accent-soft: #173a34; --warm: #e8954a; --warm-soft: #3a2a1a; --cell-empty: #222c29;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 1rem/1.55 var(--font-body); padding-inline: 16px; padding-block: 0 64px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px; }
+header.top { max-width: 1180px; margin: 0 auto; padding-block: 40px 28px; display: grid; gap: 10px; }
+.eyebrow { font: 500 0.75rem/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 700 clamp(2rem, 4vw, 3rem)/1.05 var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.lede { max-width: 68ch; color: var(--muted); margin: 0; font-size: 1.08rem; }
+
+nav.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; display: grid; gap: 2px; }
+nav.rail a { display: grid; grid-template-columns: 26px 1fr; gap: 6px; align-items: baseline; padding: 6px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: 0.93rem; }
+nav.rail a span:first-child { font: 500 0.75rem var(--font-mono); color: var(--muted); }
+nav.rail a:hover, nav.rail a:focus-visible { background: var(--surface); color: var(--ink); outline: none; }
+nav.rail a.active { background: var(--surface); color: var(--ink); box-shadow: inset 2px 0 0 var(--accent); }
+
+main { display: grid; gap: 56px; min-width: 0; }
+section { display: grid; gap: 16px; min-width: 0; scroll-margin-top: 16px; }
+section h2 { font: 700 1.6rem/1.15 var(--font-display); margin: 0; text-wrap: balance; }
+section h2 small { display: block; font: 500 0.75rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+section p, section li { max-width: 68ch; margin: 0; }
+section ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.prose { display: grid; gap: 12px; min-width: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+
+.figure { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.figure canvas { width: 100%; height: auto; aspect-ratio: 1; display: block; border-radius: 6px; cursor: crosshair; max-width: 100%; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: 0.9rem; color: var(--muted); }
+.controls label { display: flex; gap: 6px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { font: 500 0.8rem var(--font-mono); background: transparent; color: var(--muted); border: 0; padding: 5px 9px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.seg button:focus-visible, input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type=range] { accent-color: var(--accent); width: 140px; }
+.readout { font: 400 0.82rem/1.45 var(--font-mono); color: var(--muted); white-space: pre-line; min-height: 2.9em; }
+.caption { font-size: 0.85rem; color: var(--muted); }
+
+/* pipeline overview */
+.pipe { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; align-items: stretch; }
+.pipe button { flex: 0 0 auto; min-width: 104px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; color: var(--ink); font: inherit; display: grid; gap: 2px; }
+.pipe button b { font: 600 0.92rem var(--font-body); }
+.pipe button span { font: 400 0.75rem var(--font-mono); color: var(--muted); }
+.pipe button.stage { border-color: color-mix(in srgb, var(--warm) 45%, var(--line)); }
+.pipe button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.pipe .arrow { align-self: center; color: var(--muted); font-family: var(--font-mono); }
+.pipe-detail { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; }
+.pipe-detail h3 { margin: 0; font: 700 1.05rem var(--font-display); }
+.pipe-detail p { color: var(--ink); }
+.pipe-detail .mono { color: var(--muted); }
+
+/* block step-through */
+.block { display: grid; gap: 6px; }
+.block .op { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; text-align: left; color: var(--ink); font: inherit; }
+.block .op .n { font: 500 0.8rem var(--font-mono); color: var(--muted); padding-top: 2px; }
+.block .op b { display: block; font-weight: 600; }
+.block .op .what { color: var(--muted); font-size: 0.92rem; }
+.block .op[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.block .res { font: 400 0.78rem var(--font-mono); color: var(--muted); padding-left: 38px; }
+
+/* stage table */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font: 500 0.72rem var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+.bar { display: inline-block; height: 8px; border-radius: 4px; background: var(--warm); vertical-align: middle; margin-right: 8px; }
+.pill { display: inline-block; font: 500 0.72rem var(--font-mono); padding: 1px 7px; border-radius: 999px; }
+.pill.ok { background: var(--accent-soft); color: var(--accent); }
+.pill.low { background: var(--warm-soft); color: var(--warm); }
+
+/* our use */
+.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.flow .node { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 0.92rem; }
+.flow .node.hl { border-color: var(--accent); background: var(--accent-soft); }
+.flow .to { color: var(--muted); font-family: var(--font-mono); }
+
+@media (max-width: 860px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  nav.rail { display: none; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<header class="top">
+  <div class="eyebrow">Experiment 04 · encoder for SQ fitting</div>
+  <h1>How Point Transformer V3 reads a scene</h1>
+  <p class="lede">PTv3 is the encoder behind Sonata. It turns a whole Replica scene into a few thousand feature tokens. This page walks through each step with a 2D toy room and the numbers we measured on Replica.</p>
+</header>
+
+<div class="wrap">
+  <nav class="rail" aria-label="Steps">
+    <a href="#overview"><span>00</span><span>Overview</span></a>
+    <a href="#input"><span>01</span><span>Input &amp; embedding</span></a>
+    <a href="#serialize"><span>02</span><span>Serialization</span></a>
+    <a href="#block"><span>03</span><span>One block</span></a>
+    <a href="#pool"><span>04</span><span>Grid pooling</span></a>
+    <a href="#stages"><span>05</span><span>Stages on Replica</span></a>
+    <a href="#output"><span>06</span><span>Output &amp; unpooling</span></a>
+    <a href="#sonata"><span>07</span><span>Sonata weights</span></a>
+    <a href="#ours"><span>08</span><span>Use in our SQ model</span></a>
+  </nav>
+
+  <main>
+    <section id="overview">
+      <h2><small>Overview</small>The pipeline at a glance</h2>
+      <p>Click a step to see what it does. Numbers are for <span class="mono">room_0</span> at a 2 cm input grid.</p>
+      <div class="pipe" id="pipe" role="group" aria-label="Pipeline steps"></div>
+      <div class="pipe-detail" id="pipeDetail" aria-live="polite"></div>
+    </section>
+
+    <section id="input">
+      <h2><small>Step 01</small>Input and embedding</h2>
+      <div class="prose">
+        <p>The 1 cm Replica cloud is first thinned to one point per 2 cm grid cell. For <span class="mono">room_0</span> that leaves 444,744 points; <span class="mono">apartment_0</span> has 2.1 million. The scene is shifted so its xy-center is at 0 and its floor at z = 0.</p>
+        <p>Each point carries 9 numbers: position (x, y, z), color (r, g, b, scaled to [-1, 1]) and normal (nx, ny, nz). Each point also keeps its integer grid cell, which later steps use for neighbor lookups.</p>
+        <p>The embedding is a single linear layer, followed by LayerNorm and GELU, that maps the 9 numbers to 48 features per point. It looks at one point at a time; neighbors only come in during the blocks.</p>
+      </div>
+    </section>
+
+    <section id="serialize">
+      <h2><small>Step 02</small>Serialization: from a cloud to a sequence</h2>
+      <div class="cols">
+        <div class="prose">
+          <p>Full attention between 445k points would mean about 2·10<sup>11</sup> pairs. PTv3 avoids that by sorting points along a <b>space-filling curve</b>: a path through the grid that visits every cell once and mostly steps between neighbors. Points close in the sorted list are then usually close in space.</p>
+          <p>The sorted list is cut into <b>patches</b> of 1024 consecutive points, and attention runs only inside each patch. Each colored region on the right is one patch.</p>
+          <p>The order only decides which points share a patch. Inside a patch, attention does not use the sequence positions at all; spatial layout reaches the features through the convolution in each block (step 03).</p>
+          <p>A curve sometimes jumps, so a patch border can separate two real neighbors. Sonata therefore uses four orders: <code>z</code> and <code>hilbert</code> curves, each also with x and y swapped (<code>-trans</code>). Consecutive blocks use different orders, so patch borders move and information crosses them.</p>
+          <p><b>Try it:</b> click a cell. The outlined cells are what it attends to under the selected order; the readout shows how many distinct cells it reaches across all four orders.</p>
+        </div>
+        <div class="figure">
+          <div class="controls">
+            <div class="seg" id="orderSeg" role="group" aria-label="Curve order"></div>
+            <label for="patchSize">patch <input id="patchSize" type="range" min="8" max="128" step="8" value="48"><span class="mono" id="patchVal">48</span></label>
+            <label for="showPath"><input id="showPath" type="checkbox" checked> path</label>
+          </div>
+          <canvas id="serialCanvas" width="512" height="512" aria-label="Toy room serialized along a space-filling curve"></canvas>
+          <div class="readout" id="serialReadout">Click a cell to see its attention patch.</div>
+          <div class="caption">Top-down toy room on a 64 × 64 grid: walls with a door, sofa, table, two chairs, plant. Patch size is scaled down from 1024 so patches are visible.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="block">
+      <h2><small>Step 03</small>One block</h2>
+      <div class="cols">
+        <div class="prose">
+          <p>Every stage is a stack of identical blocks. A block keeps the number of points and channels; it only updates each point's features. Each of the three operations adds its result to the features it received (a residual connection), so a block can never destroy information, only add to it.</p>
+          <p>Click an operation for details.</p>
+          <div class="readout" id="blockReadout" style="white-space: normal; font-family: var(--font-body); font-size: 0.95rem; color: var(--ink);"></div>
+        </div>
+        <div class="block" id="blockOps"></div>
+      </div>
+    </section>
+
+    <section id="pool">
+      <h2><small>Step 04</small>Grid pooling between stages</h2>
+      <div class="cols">
+        <div class="prose">
+          <p>After each stage, points that fall into the same 2 × 2 × 2 cell of a twice-as-coarse grid are merged into one. Their features pass through a linear layer (the channel count doubles) and are max-pooled; their coordinates are averaged.</p>
+          <p>The network remembers which fine point went into which coarse point. That is what lets features be copied back to every input point later, and what our viewer uses for its "token" coloring.</p>
+          <p>Because a patch always holds 1024 points, a coarser grid makes the same patch cover a larger area: from roughly 0.6 m at stage 0 to about 10 m at stage 4. Early stages see detail, late stages see the whole room.</p>
+          <p><b>Try it:</b> step through the levels. Cells are colored by the object most of their points belong to; a cell that mixes objects gets an amber outline.</p>
+        </div>
+        <div class="figure">
+          <div class="controls">
+            <div class="seg" id="levelSeg" role="group" aria-label="Pooling level"></div>
+          </div>
+          <canvas id="poolCanvas" width="512" height="512" aria-label="Toy room after grid pooling"></canvas>
+          <div class="readout" id="poolReadout"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="stages">
+      <h2><small>Step 05</small>Stages on Replica</h2>
+      <p>Measured with Sonata on the 2 cm grid. <b>Purity</b>: share of points whose token's majority instance is their own. <b>Coverage</b>: share of GT instances that are the majority of at least one token. An instance without such a token cannot get a query placed on it.</p>
+      <div class="controls"><div class="seg" id="sceneSeg" role="group" aria-label="Scene"></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Stage</th><th>Cell</th><th>Blocks</th><th>Channels</th><th>Heads</th><th>Patch area</th><th>Tokens</th><th>Purity</th><th>Coverage</th></tr></thead>
+          <tbody id="stageBody"></tbody>
+        </table>
+      </div>
+      <p class="caption">Most of the computation sits in stage 3 (12 blocks). Patch area ≈ 1024 × cell², for points that lie on surfaces. Full inference: 0.08 s and 1.4 GB for room_0, 0.38 s and 5.0 GB for apartment_0 (RTX 5090, bf16).</p>
+    </section>
+
+    <section id="output">
+      <h2><small>Step 06</small>Output and unpooling</h2>
+      <div class="prose">
+        <p>Sonata is encoder-only: its output is the coarsest stage, 1,496 tokens with 512 features each for <span class="mono">room_0</span>.</p>
+        <p>To get a feature for every input point, walk the pooling record backwards. The recommended per-point feature concatenates the token features of stages 4, 3 and 2 (512 + 384 + 192 = 1,088 values) and copies them down to each 2 cm point. One more lookup (<code>inverse</code>) maps them back to the original 1 cm points.</p>
+      </div>
+    </section>
+
+    <section id="sonata">
+      <h2><small>Step 07</small>What Sonata adds</h2>
+      <div class="prose">
+        <p>Sonata is this exact architecture, 108.5M parameters, with weights learned without labels on a large collection of indoor and outdoor point clouds (on the order of 140k scenes). It is trained by self-distillation: the network must produce matching features for differently cropped and augmented views of the same scene.</p>
+        <p>In our zero-shot test on Replica, nearby points of the same instance were only slightly more similar in Sonata features than in a randomly initialized PTv3 (distance-controlled AUC ≈ 0.72 for both). Pretrained features usually show their value once a head is trained on top, so this does not settle the question.</p>
+      </div>
+    </section>
+
+    <section id="ours">
+      <h2><small>Step 08</small>Use in our SQ model</h2>
+      <div class="flow" aria-label="Planned model">
+        <span class="node">Replica scene</span><span class="to">→</span>
+        <span class="node">PTv3 / Sonata</span><span class="to">→</span>
+        <span class="node hl">tokens of stage 2 or 3</span><span class="to">→</span>
+        <span class="node hl">farthest-point sampling → N queries</span><span class="to">→</span>
+        <span class="node">decoder: self- + cross-attention</span><span class="to">→</span>
+        <span class="node">SQ params + existence</span>
+      </div>
+      <ul>
+        <li>The decoder's queries cross-attend to tokens of one stage. Stage 4 covers only 46–73% of instances, stage 3 70–82%, stage 2 81–98%, so stage 2 or 3 is the safer source.</li>
+        <li>Queries start at token positions picked by farthest-point sampling, so their number can grow with the scene size instead of a fixed 256.</li>
+        <li>The pooling record gives a point-to-token assignment for free at every stage, useful for the loss and later for grouping SQs.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  // ---------------- pipeline overview ----------------
+  const STEPS = [
+    { id: "input", name: "Input", dim: "445k × 9", text: "Grid-sampled points with position, color and normal.", cls: "" },
+    { id: "input", name: "Embedding", dim: "445k × 48", text: "Linear layer + LayerNorm + GELU, applied to each point on its own.", cls: "" },
+    { id: "block", name: "Stage 0", dim: "3 blocks · 2 cm", text: "445k points, 48 channels, 3 heads. Fine local detail; a patch covers about 0.4 m².", cls: "stage" },
+    { id: "pool", name: "Stage 1", dim: "3 blocks · 4 cm", text: "113k points, 96 channels, 6 heads.", cls: "stage" },
+    { id: "pool", name: "Stage 2", dim: "3 blocks · 8 cm", text: "28k points, 192 channels, 12 heads. Token purity 0.96: tokens rarely mix instances.", cls: "stage" },
+    { id: "stages", name: "Stage 3", dim: "12 blocks · 16 cm", text: "6.7k points, 384 channels, 24 heads. The deepest stage, where most computation happens.", cls: "stage" },
+    { id: "output", name: "Stage 4", dim: "3 blocks · 32 cm", text: "1.5k points, 512 channels, 32 heads. Each patch spans most of the room.", cls: "stage" },
+    { id: "output", name: "Output", dim: "1.5k × 512", text: "Coarsest tokens; features can be copied back down to every point.", cls: "" },
+  ];
+  const pipe = $("pipe");
+  STEPS.forEach((s, i) => {
+    if (i) pipe.insertAdjacentHTML("beforeend", '<span class="arrow" aria-hidden="true">→</span>');
+    const b = document.createElement("button");
+    b.className = s.cls;
+    b.innerHTML = `<b>${s.name}</b><span>${s.dim}</span>`;
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => selectStep(i));
+    pipe.appendChild(b);
+  });
+  function selectStep(i) {
+    [...pipe.querySelectorAll("button")].forEach((b, j) => b.setAttribute("aria-pressed", String(i === j)));
+    const s = STEPS[i];
+    $("pipeDetail").innerHTML = `<h3>${s.name} <span class="mono">${s.dim}</span></h3><p>${s.text}</p><p><a href="#${s.id}">Details below ↓</a></p>`;
+  }
+  selectStep(2);
+
+  // ---------------- toy room ----------------
+  const N = 64;
+  const occ = new Int16Array(N * N).fill(-1); // object id per cell, -1 empty
+  const NAMES = ["wall", "sofa", "table", "chair", "chair", "plant"];
+  const put = (x, y, id) => { if (x >= 0 && y >= 0 && x < N && y < N) occ[y * N + x] = id; };
+  for (let i = 2; i < 62; i++) { put(i, 2, 0); put(i, 61, 0); put(2, i, 0); if (i < 26 || i > 33) put(61, i, 0); }
+  const rect = (x0, y0, x1, y1, id) => { for (let x = x0; x <= x1; x++) { put(x, y0, id); put(x, y1, id); } for (let y = y0; y <= y1; y++) { put(x0, y, id); put(x1, y, id); } };
+  rect(10, 8, 40, 16, 1);                    // sofa
+  for (let a = 0; a < 360; a += 2) { const r = a * Math.PI / 180; put(Math.round(26 + 11 * Math.cos(r)), Math.round(34 + 6 * Math.sin(r)), 2); } // table
+  rect(14, 46, 21, 53, 3); rect(31, 46, 38, 53, 4); // chairs
+  for (let a = 0; a < 360; a += 4) { const r = a * Math.PI / 180; put(Math.round(52 + 4 * Math.cos(r)), Math.round(50 + 4 * Math.sin(r)), 5); } // plant
+  const cells = [];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (occ[y * N + x] >= 0) cells.push({ x, y, id: occ[y * N + x] });
+
+  // space-filling curves on the 64 x 64 grid
+  function morton(x, y) { let k = 0; for (let b = 0; b < 6; b++) { k |= ((x >> b) & 1) << (2 * b); k |= ((y >> b) & 1) << (2 * b + 1); } return k; }
+  function hilbert(x, y) { let d = 0; for (let s = N / 2; s > 0; s >>= 1) { const rx = (x & s) > 0 ? 1 : 0, ry = (y & s) > 0 ? 1 : 0; d += s * s * ((3 * rx) ^ ry); if (ry === 0) { if (rx === 1) { x = s - 1 - x; y = s - 1 - y; } const t = x; x = y; y = t; } } return d; }
+  const ORDERS = {
+    "z": (c) => morton(c.x, c.y), "z-trans": (c) => morton(c.y, c.x),
+    "hilbert": (c) => hilbert(c.x, c.y), "hilbert-trans": (c) => hilbert(c.y, c.x),
+  };
+  const sorted = {};
+  for (const [k, f] of Object.entries(ORDERS)) sorted[k] = cells.map((c, i) => [f(c), i]).sort((a, b) => a[0] - b[0]).map((p) => p[1]);
+  const rankOf = {};
+  for (const k in sorted) { rankOf[k] = new Int32Array(cells.length); sorted[k].forEach((ci, r) => { rankOf[k][ci] = r; }); }
+
+  function hue(i, s = 62, l = 55) { return `hsl(${(i * 137.508) % 360} ${s}% ${l}%)`; }
+  const dark = () => css("--bg").startsWith("#1");
+
+  let order = "hilbert", picked = -1;
+  const orderSeg = $("orderSeg");
+  for (const k of Object.keys(ORDERS)) {
+    const b = document.createElement("button");
+    b.textContent = k; b.setAttribute("aria-pressed", String(k === order));
+    b.addEventListener("click", () => { order = k; [...orderSeg.children].forEach((c) => c.setAttribute("aria-pressed", String(c.textContent === k))); drawSerial(); });
+    orderSeg.appendChild(b);
+  }
+
+  function setupCanvas(cv) {
+    const r = devicePixelRatio || 1, w = cv.clientWidth || 512;
+    cv.width = Math.round(w * r); cv.height = Math.round(w * r);
+    const ctx = cv.getContext("2d"); ctx.setTransform(cv.width / N, 0, 0, cv.height / N, 0, 0);
+    return ctx;
+  }
+
+  function patchCells(k, ci, P) { const p = Math.floor(rankOf[k][ci] / P); return sorted[k].slice(p * P, p * P + P); }
+
+  function drawSerial() {
+    const cv = $("serialCanvas"), ctx = setupCanvas(cv), P = +$("patchSize").value;
+    $("patchVal").textContent = P;
+    ctx.fillStyle = css("--cell-empty"); ctx.fillRect(0, 0, N, N);
+    const L = dark() ? 50 : 58;
+    sorted[order].forEach((ci, r) => { const c = cells[ci]; ctx.fillStyle = hue(Math.floor(r / P), 60, L); ctx.fillRect(c.x, c.y, 1, 1); });
+    if ($("showPath").checked) {
+      ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.35; ctx.lineWidth = 0.12; ctx.beginPath();
+      sorted[order].forEach((ci, r) => { const c = cells[ci]; r ? ctx.lineTo(c.x + 0.5, c.y + 0.5) : ctx.moveTo(c.x + 0.5, c.y + 0.5); });
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    if (picked >= 0) {
+      const mine = new Set(patchCells(order, picked, P));
+      ctx.fillStyle = css("--bg"); ctx.globalAlpha = 0.72;
+      cells.forEach((c, i) => { if (!mine.has(i)) ctx.fillRect(c.x, c.y, 1, 1); });
+      ctx.globalAlpha = 1; ctx.strokeStyle = css("--accent"); ctx.lineWidth = 0.18;
+      mine.forEach((i) => ctx.strokeRect(cells[i].x + 0.09, cells[i].y + 0.09, 0.82, 0.82));
+      const c = cells[picked]; ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(c.x + 0.5, c.y + 0.5, 0.7, 0, 7); ctx.fill();
+      const union = new Set(); for (const k in ORDERS) patchCells(k, picked, P).forEach((i) => union.add(i));
+      const objs = new Set([...mine].map((i) => NAMES[cells[i].id]));
+      $("serialReadout").textContent = `picked: ${NAMES[c.id]} at (${c.x}, ${c.y})\n` +
+        `${order}: attends to ${mine.size} cells (${[...objs].join(", ")})\n` +
+        `all 4 orders together: ${union.size} distinct cells`;
+    }
+  }
+  $("serialCanvas").addEventListener("click", (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) / r.width * N), y = Math.floor((e.clientY - r.top) / r.height * N);
+    let best = -1, bd = 9;
+    cells.forEach((c, i) => { const d = (c.x - x) ** 2 + (c.y - y) ** 2; if (d < bd) { bd = d; best = i; } });
+    if (best >= 0) { picked = best; drawSerial(); }
+  });
+  $("patchSize").addEventListener("input", drawSerial);
+  $("showPath").addEventListener("change", drawSerial);
+
+  // ---------------- pooling ----------------
+  let level = 0;
+  const levelSeg = $("levelSeg");
+  ["stage 0 · 2 cm", "1 · 4 cm", "2 · 8 cm", "3 · 16 cm", "4 · 32 cm"].forEach((t, i) => {
+    const b = document.createElement("button"); b.textContent = t; b.setAttribute("aria-pressed", String(i === 0));
+    b.addEventListener("click", () => { level = i; [...levelSeg.children].forEach((c, j) => c.setAttribute("aria-pressed", String(i === j))); drawPool(); });
+    levelSeg.appendChild(b);
+  });
+  function drawPool() {
+    const cv = $("poolCanvas"), ctx = setupCanvas(cv), s = 1 << level;
+    ctx.fillStyle = css("--cell-empty"); ctx.fillRect(0, 0, N, N);
+    const groups = new Map();
+    for (const c of cells) { const k = `${c.x >> level},${c.y >> level}`; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(c); }
+    let pure = 0, mixed = 0;
+    const majorOf = new Set();
+    for (const [k, g] of groups) {
+      const cnt = {}; g.forEach((c) => { cnt[c.id] = (cnt[c.id] || 0) + 1; });
+      const [maj, n] = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+      majorOf.add(+maj); pure += n;
+      const [gx, gy] = k.split(",").map(Number);
+      ctx.fillStyle = hue(+maj * 3 + 1, 55, dark() ? 50 : 60); ctx.fillRect(gx * s, gy * s, s, s);
+      if (Object.keys(cnt).length > 1) { mixed++; ctx.strokeStyle = css("--warm"); ctx.lineWidth = Math.max(0.15, s * 0.08); ctx.strokeRect(gx * s + ctx.lineWidth / 2, gy * s + ctx.lineWidth / 2, s - ctx.lineWidth, s - ctx.lineWidth); }
+    }
+    const lost = NAMES.map((n, i) => i).filter((i) => !majorOf.has(i)).map((i) => NAMES[i]);
+    $("poolReadout").textContent = `${groups.size} tokens from ${cells.length} cells · ${mixed} mix objects\n` +
+      `purity ${(pure / cells.length).toFixed(2)} · objects without own token: ${lost.length ? lost.join(", ") : "none"}`;
+  }
+
+  // ---------------- block ----------------
+  const OPS = [
+    { name: "Conditional position encoding (xCPE)", what: "sparse 3×3×3 convolution + linear + LayerNorm",
+      text: "Each voxel aggregates features from the occupied cells in its 3×3×3 neighborhood, with a separate weight for each of the 27 relative offsets. That is what makes it 'positional': it writes the local geometry into the features (which neighbor is occupied, and where). It has nothing to do with serialization and assigns no sequence index. Attention needs it because, with relative position encoding switched off as in Sonata, attention only compares feature vectors and ignores where points are and their order inside the patch. It is the only part that needs the spconv library." },
+    { name: "LayerNorm → serialized attention", what: "patches of 1024 consecutive points, multi-head",
+      text: "Within each patch, every point compares itself with every other point and takes a weighted mix of their features. The order (z, z-trans, hilbert, hilbert-trans) changes from block to block. Heads grow with depth: 3 in stage 0 up to 32 in stage 4. In our setup this runs through PyTorch's fused attention (SDPA) instead of FlashAttention." },
+    { name: "LayerNorm → MLP", what: "per point: channels × 4, GELU, back",
+      text: "A small two-layer network applied to each point on its own. Attention gathers information; the MLP processes it. During training, whole blocks are randomly skipped (drop path 0.3) as regularization." },
+  ];
+  const ops = $("blockOps");
+  OPS.forEach((o, i) => {
+    const b = document.createElement("button");
+    b.className = "op"; b.setAttribute("aria-pressed", String(i === 1));
+    b.innerHTML = `<span class="n">${i + 1}</span><span><b>${o.name}</b><span class="what">${o.what}</span></span>`;
+    b.addEventListener("click", () => selectOp(i));
+    ops.appendChild(b);
+    ops.insertAdjacentHTML("beforeend", `<div class="res">+ add to input (residual)</div>`);
+  });
+  function selectOp(i) {
+    [...ops.querySelectorAll(".op")].forEach((b, j) => b.setAttribute("aria-pressed", String(i === j)));
+    $("blockReadout").textContent = OPS[i].text;
+  }
+  selectOp(1);
+
+  // ---------------- stage table ----------------
+  const ARCH = { blocks: [3, 3, 3, 12, 3], ch: [48, 96, 192, 384, 512], heads: [3, 6, 12, 24, 32] };
+  const SCENES = {
+    "room_0": { tokens: [444744, 112882, 27916, 6705, 1496], purity: [1.000, 0.982, 0.960, 0.915, 0.824], coverage: [1.00, 1.00, 0.98, 0.82, 0.62] },
+    "frl_apartment_0": { tokens: [809718, 206847, 51107, 12362, 2797], purity: [1.000, 0.984, 0.963, 0.910, 0.820], coverage: [1.00, 1.00, 0.96, 0.76, 0.46] },
+  };
+  let sceneName = "room_0";
+  const sceneSeg = $("sceneSeg");
+  for (const k of Object.keys(SCENES)) {
+    const b = document.createElement("button"); b.textContent = k; b.setAttribute("aria-pressed", String(k === sceneName));
+    b.addEventListener("click", () => { sceneName = k; [...sceneSeg.children].forEach((c) => c.setAttribute("aria-pressed", String(c.textContent === k))); drawTable(); });
+    sceneSeg.appendChild(b);
+  }
+  function drawTable() {
+    const s = SCENES[sceneName], maxLog = Math.log10(s.tokens[0]);
+    $("stageBody").innerHTML = s.tokens.map((t, i) => {
+      const cell = 0.02 * 2 ** i, area = 1024 * cell * cell;
+      const w = Math.max(6, 90 * Math.log10(t) / maxLog);
+      const cov = s.coverage[i], pill = cov >= 0.9 ? "ok" : "low";
+      return `<tr><td>${i}</td><td>${Math.round(cell * 100)} cm</td><td>${ARCH.blocks[i]}</td><td>${ARCH.ch[i]}</td><td>${ARCH.heads[i]}</td>` +
+        `<td>${area < 1 ? area.toFixed(2) : area.toFixed(0)} m²</td><td><span class="bar" style="width:${w}px"></span>${t.toLocaleString("en-US")}</td>` +
+        `<td>${s.purity[i].toFixed(3)}</td><td><span class="pill ${pill}">${cov.toFixed(2)}</span></td></tr>`;
+    }).join("");
+  }
+
+  // ---------------- rail highlighting ----------------
+  const links = [...document.querySelectorAll("nav.rail a")];
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting) links.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + e.target.id)); });
+  }, { rootMargin: "-30% 0px -60% 0px" });
+  document.querySelectorAll("main section").forEach((s) => io.observe(s));
+
+  function redraw() { drawSerial(); drawPool(); }
+  drawTable();
+  picked = cells.findIndex((c) => c.id === 2);
+  redraw();
+  addEventListener("resize", redraw);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => setTimeout(redraw, 0));
+  new MutationObserver(() => setTimeout(redraw, 0)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>

@@ -1,0 +1,922 @@
+{
+ "config": {
+  "in_channels": 9,
+  "order": [
+   "z",
+   "z-trans",
+   "hilbert",
+   "hilbert-trans"
+  ],
+  "stride": [
+   2,
+   2,
+   2,
+   2
+  ],
+  "enc_depths": [
+   3,
+   3,
+   3,
+   12,
+   3
+  ],
+  "enc_channels": [
+   48,
+   96,
+   192,
+   384,
+   512
+  ],
+  "enc_num_head": [
+   3,
+   6,
+   12,
+   24,
+   32
+  ],
+  "enc_patch_size": [
+   1024,
+   1024,
+   1024,
+   1024,
+   1024
+  ],
+  "mlp_ratio": 4,
+  "qkv_bias": true,
+  "qk_scale": null,
+  "attn_drop": 0.0,
+  "proj_drop": 0.0,
+  "drop_path": 0.3,
+  "shuffle_orders": true,
+  "pre_norm": true,
+  "enable_rpe": false,
+  "enable_flash": true,
+  "upcast_attention": false,
+  "upcast_softmax": false,
+  "traceable": true,
+  "enc_mode": true,
+  "mask_token": true
+ },
+ "rows": [
+  {
+   "scene": "room_0",
+   "mode": "infer",
+   "grid": 0.02,
+   "points_in": 444744,
+   "oom": false,
+   "seconds": 0.07584241600125097,
+   "peak_gb": 1.425511424,
+   "stages": [
+    [
+     1496,
+     512,
+     null
+    ],
+    [
+     6705,
+     384,
+     null
+    ],
+    [
+     27916,
+     192,
+     null
+    ],
+    [
+     112882,
+     96,
+     null
+    ],
+    [
+     444744,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "office_3",
+   "mode": "infer",
+   "grid": 0.02,
+   "points_in": 547032,
+   "oom": false,
+   "seconds": 0.09570057699966128,
+   "peak_gb": 1.640041984,
+   "stages": [
+    [
+     1954,
+     512,
+     null
+    ],
+    [
+     8454,
+     384,
+     null
+    ],
+    [
+     35591,
+     192,
+     null
+    ],
+    [
+     143117,
+     96,
+     null
+    ],
+    [
+     547032,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "frl_apartment_0",
+   "mode": "infer",
+   "grid": 0.02,
+   "points_in": 809718,
+   "oom": false,
+   "seconds": 0.14947344999927736,
+   "peak_gb": 2.196086272,
+   "stages": [
+    [
+     2797,
+     512,
+     null
+    ],
+    [
+     12362,
+     384,
+     null
+    ],
+    [
+     51107,
+     192,
+     null
+    ],
+    [
+     206847,
+     96,
+     null
+    ],
+    [
+     809718,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "apartment_0",
+   "mode": "infer",
+   "grid": 0.02,
+   "points_in": 2119858,
+   "oom": false,
+   "seconds": 0.37872023499949137,
+   "peak_gb": 4.96874752,
+   "stages": [
+    [
+     7358,
+     512,
+     null
+    ],
+    [
+     32773,
+     384,
+     null
+    ],
+    [
+     137084,
+     192,
+     null
+    ],
+    [
+     547636,
+     96,
+     null
+    ],
+    [
+     2119858,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "room_0",
+   "mode": "train",
+   "grid": 0.02,
+   "points_in": 444744,
+   "oom": false,
+   "seconds": 0.14918896700146433,
+   "peak_gb": 8.738238976,
+   "stages": [
+    [
+     1496,
+     512,
+     null
+    ],
+    [
+     6705,
+     384,
+     null
+    ],
+    [
+     27916,
+     192,
+     null
+    ],
+    [
+     112882,
+     96,
+     null
+    ],
+    [
+     444744,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "office_3",
+   "mode": "train",
+   "grid": 0.02,
+   "points_in": 547032,
+   "oom": false,
+   "seconds": 0.18387856600020314,
+   "peak_gb": 10.71549696,
+   "stages": [
+    [
+     1954,
+     512,
+     null
+    ],
+    [
+     8454,
+     384,
+     null
+    ],
+    [
+     35591,
+     192,
+     null
+    ],
+    [
+     143117,
+     96,
+     null
+    ],
+    [
+     547032,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "frl_apartment_0",
+   "mode": "train",
+   "grid": 0.02,
+   "points_in": 809718,
+   "oom": false,
+   "seconds": 0.27519359100006113,
+   "peak_gb": 15.305143296,
+   "stages": [
+    [
+     2797,
+     512,
+     null
+    ],
+    [
+     12362,
+     384,
+     null
+    ],
+    [
+     51107,
+     192,
+     null
+    ],
+    [
+     206847,
+     96,
+     null
+    ],
+    [
+     809718,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "apartment_0",
+   "mode": "train",
+   "grid": 0.02,
+   "points_in": null,
+   "seconds": null,
+   "peak_gb": null,
+   "stages": [],
+   "oom": true,
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "room_0",
+   "mode": "train",
+   "grid": 0.04,
+   "points_in": 112911,
+   "oom": false,
+   "seconds": 0.0670253070002218,
+   "peak_gb": 2.808876544,
+   "stages": [
+    [
+     338,
+     512,
+     null
+    ],
+    [
+     1513,
+     384,
+     null
+    ],
+    [
+     6730,
+     192,
+     null
+    ],
+    [
+     27952,
+     96,
+     null
+    ],
+    [
+     112911,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "office_3",
+   "mode": "train",
+   "grid": 0.04,
+   "points_in": 142860,
+   "oom": false,
+   "seconds": 0.07310234799842874,
+   "peak_gb": 3.316836352,
+   "stages": [
+    [
+     441,
+     512,
+     null
+    ],
+    [
+     1952,
+     384,
+     null
+    ],
+    [
+     8449,
+     192,
+     null
+    ],
+    [
+     35569,
+     96,
+     null
+    ],
+    [
+     142860,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "frl_apartment_0",
+   "mode": "train",
+   "grid": 0.04,
+   "points_in": 206830,
+   "oom": false,
+   "seconds": 0.08936864399947808,
+   "peak_gb": 4.404671488,
+   "stages": [
+    [
+     608,
+     512,
+     null
+    ],
+    [
+     2805,
+     384,
+     null
+    ],
+    [
+     12372,
+     192,
+     null
+    ],
+    [
+     51070,
+     96,
+     null
+    ],
+    [
+     206830,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "apartment_0",
+   "mode": "train",
+   "grid": 0.04,
+   "points_in": 547656,
+   "oom": false,
+   "seconds": 0.17951821700080473,
+   "peak_gb": 10.31410944,
+   "stages": [
+    [
+     1587,
+     512,
+     null
+    ],
+    [
+     7352,
+     384,
+     null
+    ],
+    [
+     32722,
+     192,
+     null
+    ],
+    [
+     136979,
+     96,
+     null
+    ],
+    [
+     547656,
+     48,
+     null
+    ]
+   ],
+   "model": "sonata",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "room_0",
+   "mode": "infer",
+   "grid": 0.02,
+   "points_in": 444744,
+   "oom": false,
+   "seconds": 0.07577581999976246,
+   "peak_gb": 1.459651584,
+   "stages": [
+    [
+     1496,
+     512,
+     null
+    ],
+    [
+     6705,
+     384,
+     null
+    ],
+    [
+     27916,
+     192,
+     null
+    ],
+    [
+     112882,
+     96,
+     null
+    ],
+    [
+     444744,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "office_3",
+   "mode": "infer",
+   "grid": 0.02,
+   "points_in": 547032,
+   "oom": false,
+   "seconds": 0.09413698999924236,
+   "peak_gb": 1.675538944,
+   "stages": [
+    [
+     1954,
+     512,
+     null
+    ],
+    [
+     8454,
+     384,
+     null
+    ],
+    [
+     35591,
+     192,
+     null
+    ],
+    [
+     143117,
+     96,
+     null
+    ],
+    [
+     547032,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "frl_apartment_0",
+   "mode": "infer",
+   "grid": 0.02,
+   "points_in": 809718,
+   "oom": false,
+   "seconds": 0.14912438999999722,
+   "peak_gb": 2.230408704,
+   "stages": [
+    [
+     2797,
+     512,
+     null
+    ],
+    [
+     12362,
+     384,
+     null
+    ],
+    [
+     51107,
+     192,
+     null
+    ],
+    [
+     206847,
+     96,
+     null
+    ],
+    [
+     809718,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "apartment_0",
+   "mode": "infer",
+   "grid": 0.02,
+   "points_in": 2119858,
+   "oom": false,
+   "seconds": 0.3798439239999425,
+   "peak_gb": 5.003652608,
+   "stages": [
+    [
+     7358,
+     512,
+     null
+    ],
+    [
+     32773,
+     384,
+     null
+    ],
+    [
+     137084,
+     192,
+     null
+    ],
+    [
+     547636,
+     96,
+     null
+    ],
+    [
+     2119858,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "room_0",
+   "mode": "train",
+   "grid": 0.02,
+   "points_in": 444744,
+   "oom": false,
+   "seconds": 0.14831166499971005,
+   "peak_gb": 8.739076096,
+   "stages": [
+    [
+     1496,
+     512,
+     null
+    ],
+    [
+     6705,
+     384,
+     null
+    ],
+    [
+     27916,
+     192,
+     null
+    ],
+    [
+     112882,
+     96,
+     null
+    ],
+    [
+     444744,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "office_3",
+   "mode": "train",
+   "grid": 0.02,
+   "points_in": 547032,
+   "oom": false,
+   "seconds": 0.1840390710003703,
+   "peak_gb": 10.71333632,
+   "stages": [
+    [
+     1954,
+     512,
+     null
+    ],
+    [
+     8454,
+     384,
+     null
+    ],
+    [
+     35591,
+     192,
+     null
+    ],
+    [
+     143117,
+     96,
+     null
+    ],
+    [
+     547032,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "frl_apartment_0",
+   "mode": "train",
+   "grid": 0.02,
+   "points_in": 809718,
+   "oom": false,
+   "seconds": 0.2760683649994462,
+   "peak_gb": 15.304555008,
+   "stages": [
+    [
+     2797,
+     512,
+     null
+    ],
+    [
+     12362,
+     384,
+     null
+    ],
+    [
+     51107,
+     192,
+     null
+    ],
+    [
+     206847,
+     96,
+     null
+    ],
+    [
+     809718,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "apartment_0",
+   "mode": "train",
+   "grid": 0.02,
+   "points_in": null,
+   "seconds": null,
+   "peak_gb": null,
+   "stages": [],
+   "oom": true,
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "room_0",
+   "mode": "train",
+   "grid": 0.04,
+   "points_in": 112911,
+   "oom": false,
+   "seconds": 0.06747010100116313,
+   "peak_gb": 2.809214976,
+   "stages": [
+    [
+     338,
+     512,
+     null
+    ],
+    [
+     1513,
+     384,
+     null
+    ],
+    [
+     6730,
+     192,
+     null
+    ],
+    [
+     27952,
+     96,
+     null
+    ],
+    [
+     112911,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "office_3",
+   "mode": "train",
+   "grid": 0.04,
+   "points_in": 142860,
+   "oom": false,
+   "seconds": 0.07396514299944101,
+   "peak_gb": 3.317039616,
+   "stages": [
+    [
+     441,
+     512,
+     null
+    ],
+    [
+     1952,
+     384,
+     null
+    ],
+    [
+     8449,
+     192,
+     null
+    ],
+    [
+     35569,
+     96,
+     null
+    ],
+    [
+     142860,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "frl_apartment_0",
+   "mode": "train",
+   "grid": 0.04,
+   "points_in": 206830,
+   "oom": false,
+   "seconds": 0.08877677600139577,
+   "peak_gb": 4.40243456,
+   "stages": [
+    [
+     608,
+     512,
+     null
+    ],
+    [
+     2805,
+     384,
+     null
+    ],
+    [
+     12372,
+     192,
+     null
+    ],
+    [
+     51070,
+     96,
+     null
+    ],
+    [
+     206830,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  },
+  {
+   "scene": "apartment_0",
+   "mode": "train",
+   "grid": 0.04,
+   "points_in": 547656,
+   "oom": false,
+   "seconds": 0.1775319970001874,
+   "peak_gb": 10.31612928,
+   "stages": [
+    [
+     1587,
+     512,
+     null
+    ],
+    [
+     7352,
+     384,
+     null
+    ],
+    [
+     32722,
+     192,
+     null
+    ],
+    [
+     136979,
+     96,
+     null
+    ],
+    [
+     547656,
+     48,
+     null
+    ]
+   ],
+   "model": "ptv3_scratch",
+   "params_m": 108.461376
+  }
+ ]
+}

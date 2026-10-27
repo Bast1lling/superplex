@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SQ Fit Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #15171c; --panel: rgba(30, 33, 40, 0.93); --fg: #e4e6eb; --muted: #9aa0ab; --line: #3a3f4b; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  .panel { position: absolute; top: 12px; padding: 12px 14px; background: var(--panel); border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.4); max-height: calc(100% - 48px); overflow-y: auto; }
+  #left { left: 12px; width: 270px; }
+  #right { right: 12px; width: 300px; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  h2 { font-size: 12px; margin: 12px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  label { display: block; margin: 7px 0 3px; color: var(--muted); }
+  select, input[type=range] { width: 100%; box-sizing: border-box; }
+  select { background: #262a33; color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; font: inherit; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row span { min-width: 50px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .check { display: flex; gap: 6px; align-items: center; color: var(--muted); margin: 5px 0; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-variant-numeric: tabular-nums; }
+  .kv div:nth-child(odd) { color: var(--muted); }
+  #info:empty::before { content: "Click an SQ to inspect it."; color: var(--muted); }
+  #loading { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); color: var(--muted); display: none; }
+</style>
+<script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  } }
+</script>
+</head>
+<body>
+<div id="left" class="panel">
+  <h1>SQ fit</h1>
+  <label for="run">Run</label>
+  <select id="run"></select>
+  <label>Step</label>
+  <div class="row"><input id="step" type="range" min="0" max="0" step="1" value="0"><span id="stepVal"></span></div>
+  <h2>Superquadrics</h2>
+  <label>Existence threshold</label>
+  <div class="row"><input id="ethr" type="range" min="0" max="1" step="0.01" value="0.5"><span id="ethrVal"></span></div>
+  <label class="check"><input id="onlyActive" type="checkbox" checked> only active (owning ≥ 10 points)</label>
+  <label>Opacity</label>
+  <div class="row"><input id="opacity" type="range" min="0.1" max="1" step="0.05" value="0.55"><span id="opacityVal"></span></div>
+  <label class="check"><input id="wire" type="checkbox"> wireframe</label>
+  <label class="check"><input id="showSq" type="checkbox" checked> show SQs</label>
+  <h2>Points</h2>
+  <label for="pmode">Color by</label>
+  <select id="pmode"><option value="gt">GT instance</option><option value="rgb">RGB</option></select>
+  <label class="check"><input id="showPts" type="checkbox" checked> show points</label>
+  <label>Point size (cm)</label>
+  <div class="row"><input id="psize" type="range" min="0.3" max="4" step="0.1" value="1.2"><span id="psizeVal"></span></div>
+  <label>Z range (m)</label>
+  <div class="row"><input id="zmin" type="range" step="0.01"><span id="zminVal"></span></div>
+  <div class="row"><input id="zmax" type="range" step="0.01"><span id="zmaxVal"></span></div>
+</div>
+<div id="right" class="panel">
+  <h2 style="margin-top:0">Metrics at this step</h2>
+  <div class="kv" id="metrics"></div>
+  <h2>Selected SQ</h2>
+  <div class="kv" id="info"></div>
+</div>
+<div id="loading">loading…</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const TOP_CUT = 0.3;
+const $ = (id) => document.getElementById(id);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.localClippingEnabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15171c);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.01, 500);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.zoomToCursor = true;
+controls.screenSpacePanning = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x707888, 2.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+sun.position.set(3, -4, 6);
+scene.add(sun);
+
+const clipLow = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), clipHigh = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+const clips = [clipLow, clipHigh];
+const ptsMat = new THREE.PointsMaterial({ vertexColors: true, sizeAttenuation: true, clippingPlanes: clips });
+ptsMat.color.setRGB(1, 1, 1);
+let pts = null, data = null, run = null, sqGroup = new THREE.Group(), bounds = null, selected = -1;
+scene.add(sqGroup);
+
+// colors: stable bright color per instance index (shared by points and SQs)
+function instColor(i) {
+  let h = Math.imul(i + 7, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13;
+  return [60 + (h & 0xff) * 0.75, 60 + ((h >>> 8) & 0xff) * 0.75, 60 + ((h >>> 16) & 0xff) * 0.75];
+}
+
+// ---------- SQ geometry: cube-sphere radially projected onto the SQ (local frame) ----------
+function gauge(x, y, z, a, e) {
+  const s = Math.abs(x / a[0]) ** (2 / e[1]) + Math.abs(y / a[1]) ** (2 / e[1]);
+  return (s ** (e[1] / e[0]) + Math.abs(z / a[2]) ** (2 / e[0])) ** (e[0] / 2);
+}
+function sqGeometry(a, e) {
+  const g = new THREE.BoxGeometry(2, 2, 2, 10, 10, 10), p = g.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.set(p.getX(i), p.getY(i), p.getZ(i)).normalize().multiply(new THREE.Vector3(...a));
+    v.divideScalar(gauge(v.x, v.y, v.z, a, e));
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+function buildSqs() {
+  for (const m of sqGroup.children) { m.geometry.dispose(); m.material.dispose(); }
+  sqGroup.clear();
+  if (!run || !$("showSq").checked) return;
+  const s = parseInt($("step").value), thr = parseFloat($("ethr").value), onlyActive = $("onlyActive").checked;
+  const op = parseFloat($("opacity").value), wire = $("wire").checked;
+  const n = run.trans[s].length;
+  let shown = 0;
+  for (let j = 0; j < n; j++) {
+    if (run.existence[s][j] < thr || (onlyActive && !run.active[s][j])) continue;
+    const c = instColor(run.sq_label[s][j]);
+    const mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(c[0] / 255, c[1] / 255, c[2] / 255), transparent: op < 1,
+      opacity: op, wireframe: wire, clippingPlanes: clips, depthWrite: op >= 1, side: THREE.DoubleSide });
+    if (j === selected) mat.emissive = new THREE.Color(0x555555);
+    const mesh = new THREE.Mesh(sqGeometry(run.scale[s][j], run.eps[s][j]), mat);
+    const R = run.rot[s][j], t = run.trans[s][j];
+    mesh.matrixAutoUpdate = false;
+    mesh.matrix.set(R[0][0], R[0][1], R[0][2], t[0], R[1][0], R[1][1], R[1][2], t[1], R[2][0], R[2][1], R[2][2], t[2], 0, 0, 0, 1);
+    mesh.userData.j = j;
+    sqGroup.add(mesh);
+    shown++;
+  }
+  showMetrics(s, shown);
+}
+
+function showMetrics(s, shown) {
+  const step = run.steps[s];
+  const h = run.history.filter((r) => r.step <= step).pop();
+  const rows = [["step", step], ["SQs shown", shown]];
+  if (h) for (const [k, v] of Object.entries(h)) if (k !== "step") rows.push([k.replace("eval/", ""), typeof v === "number" ? (Number.isInteger(v) ? v : v.toFixed(3)) : v]);
+  if (h && h.step !== step) rows.push(["(metrics from step)", h.step]);
+  $("metrics").innerHTML = rows.map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join("");
+}
+
+function showInfo() {
+  if (selected < 0) { $("info").innerHTML = ""; return; }
+  const s = parseInt($("step").value), j = selected, lab = run.sq_label[s][j];
+  const f = (a) => a.map((x) => x.toFixed(3)).join(", ");
+  $("info").innerHTML = [["SQ", j], ["voted instance", `${run.instance_ids[lab]} (${run.instance_names[lab]})`],
+    ["purity", run.purity[s][j].toFixed(3)], ["existence", run.existence[s][j].toFixed(3)], ["owned points", run.owned[s][j]],
+    ["scale (m)", f(run.scale[s][j])], ["eps", f(run.eps[s][j])], ["center", f(run.trans[s][j])],
+    ["instance IoU (final)", run.final_iou[lab].toFixed(3)]].map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join("");
+}
+
+// ---------- points ----------
+async function loadPoints(name) {
+  const res = await fetch(`/api/points?name=${encodeURIComponent(name)}`);
+  const buf = await res.arrayBuffer();
+  const n = parseInt(res.headers.get("X-Count"));
+  const lo = res.headers.get("X-Min").split(",").map(Number), ext = res.headers.get("X-Extent").split(",").map(Number);
+  data = { n, pos: new Uint16Array(buf, 0, 3 * n), y: new Uint16Array(buf, 6 * n, n), rgb: new Uint8Array(buf, 8 * n, 3 * n) };
+  const gt = new Uint8Array(3 * n);
+  for (let i = 0; i < n; i++) gt.set(instColor(data.y[i]), 3 * i);
+  data.gt = gt;
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.BufferAttribute(data.pos, 3, true));
+  if (pts) { scene.remove(pts); pts.geometry.dispose(); }
+  pts = new THREE.Points(geom, ptsMat);
+  pts.position.set(...lo); pts.scale.set(...ext); pts.frustumCulled = false;
+  scene.add(pts);
+  const newBounds = new THREE.Box3(new THREE.Vector3(...lo), new THREE.Vector3(lo[0] + ext[0], lo[1] + ext[1], lo[2] + ext[2]));
+  const changed = !bounds || !bounds.equals(newBounds);
+  bounds = newBounds;
+  if (changed) { resetZ(); fitCamera(); }
+  colorPoints();
+}
+function colorPoints() {
+  if (!pts) return;
+  pts.geometry.setAttribute("color", new THREE.BufferAttribute($("pmode").value === "gt" ? data.gt : data.rgb, 3, true));
+  pts.visible = $("showPts").checked;
+  ptsMat.size = parseFloat($("psize").value) / 100;
+  $("psizeVal").textContent = $("psize").value;
+}
+
+async function loadRun() {
+  $("loading").style.display = "block";
+  const name = $("run").value;
+  run = await (await fetch(`/api/run?name=${encodeURIComponent(name)}`)).json();
+  $("step").max = run.steps.length - 1;
+  $("step").value = run.steps.length - 1;
+  selected = -1; showInfo();
+  await loadPoints(name);
+  syncLabels(); buildSqs();
+  $("loading").style.display = "none";
+}
+
+function fitCamera() {
+  const c = bounds.getCenter(new THREE.Vector3()), r = bounds.getSize(new THREE.Vector3()).length() / 2;
+  controls.target.copy(c);
+  camera.position.copy(c).add(new THREE.Vector3(0.6, -1.0, 0.9).normalize().multiplyScalar(r * 1.5));
+  controls.update();
+}
+function applyZ(changed) {
+  let lo = parseFloat($("zmin").value), hi = parseFloat($("zmax").value);
+  if (lo > hi) { if (changed === "zmin") $("zmax").value = hi = lo; else $("zmin").value = lo = hi; }
+  clipLow.constant = -lo; clipHigh.constant = hi;
+  $("zminVal").textContent = lo.toFixed(2); $("zmaxVal").textContent = hi.toFixed(2);
+}
+function resetZ() {
+  for (const id of ["zmin", "zmax"]) { $(id).min = (bounds.min.z - 0.5).toFixed(2); $(id).max = (bounds.max.z + 0.5).toFixed(2); }
+  $("zmin").value = (bounds.min.z - 0.5).toFixed(2);
+  $("zmax").value = (bounds.max.z - TOP_CUT).toFixed(2);
+  applyZ();
+}
+function syncLabels() {
+  $("stepVal").textContent = run ? run.steps[parseInt($("step").value)] : "";
+  $("ethrVal").textContent = parseFloat($("ethr").value).toFixed(2);
+  $("opacityVal").textContent = parseFloat($("opacity").value).toFixed(2);
+}
+
+// ---------- picking ----------
+const raycaster = new THREE.Raycaster();
+renderer.domElement.addEventListener("dblclick", (e) => {
+  raycaster.setFromCamera(new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), camera);
+  const zlo = parseFloat($("zmin").value), zhi = parseFloat($("zmax").value);
+  const hit = raycaster.intersectObjects(sqGroup.children).find((h) => h.point.z >= zlo && h.point.z <= zhi);
+  selected = hit ? hit.object.userData.j : -1;
+  if (hit) { controls.target.copy(hit.point); controls.update(); }
+  buildSqs(); showInfo();
+});
+
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+$("run").addEventListener("change", loadRun);
+for (const id of ["step", "ethr", "opacity"]) $(id).addEventListener("input", () => { syncLabels(); buildSqs(); showInfo(); });
+for (const id of ["onlyActive", "wire", "showSq"]) $(id).addEventListener("change", buildSqs);
+for (const id of ["pmode", "showPts"]) $(id).addEventListener("change", colorPoints);
+$("psize").addEventListener("input", colorPoints);
+$("zmin").addEventListener("input", () => applyZ("zmin"));
+$("zmax").addEventListener("input", () => applyZ("zmax"));
+
+const runs = await (await fetch("/api/runs")).json();
+for (const r of runs) $("run").add(new Option(`${r.name}  (mIoU ${r.final["eval/mean_iou"].toFixed(3)})`, r.name));
+if (runs.length) loadRun();
+</script>
+</body>
+</html>

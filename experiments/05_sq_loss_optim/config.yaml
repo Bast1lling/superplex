@@ -1,0 +1,109 @@
+# Experiment 05: direct optimization of free SQ parameters with the loss from 03_sq_instance_fit/DESIGN.md.
+# No network: every SQ is a free parameter set, anchored on frozen Sonata tokens (experiment 04).
+# Units: meters.
+
+seed: 0
+
+data:
+  scene: room_0
+  points_dir: /home/sebastian/Documents/Uni/Thesis/data/replica_v1_points        # 1 cm clouds (experiment 01)
+  tokens_dir: /home/sebastian/Documents/Uni/Thesis/data/replica_v1_sonata/stage4  # frozen Sonata stage-4 tokens
+  version: 0              # augmentation version of the tokens (0 = no rotation, no mirror)
+  drop_unlabeled: true    # drop points whose instance has no semantic class (1-2% of points)
+
+anchors:
+  source: sonata_stage4   # sonata_stage4 (token positions of the frozen encoder) | points (labeled scene points)
+  cell: 0.64              # merge stage-4 tokens (32 cm cells) into 64 cm cells, one SQ per occupied cell
+
+init:
+  scale: 0.40             # sphere radius; > cell / 2, so neighboring SQs overlap slightly
+  eps: [1.0, 1.0]         # ellipsoid
+  rotation: identity
+  existence: 0.5
+
+parametrization:
+  scale: {type: exp, min: 0.01, max: 5.0}      # scale = exp(log_scale), clamped
+  eps: {type: sigmoid, min: 0.1, max: 1.9}     # eps = min + (max - min) * sigmoid(raw)
+  rotation: quaternion                          # normalized before use
+  existence: sigmoid
+
+sampling:
+  points_per_step: 32768
+  scheme: instance_balanced   # pick an instance uniformly, then a point uniformly within it
+
+loss:
+  sdf: radial                 # radial | taubin | gauge_lb (experiment 02); radial: best room_0 fit, 24% faster than taubin
+  truncation:                 # applied to the SDF before membership and hinge
+    mode: tanh                # none | hard (clamp to [-value, value]) | tanh (value * tanh(d / value))
+    value: 0.10               # inside tanh at 10 cm: mIoU 0.753 +- 0.002 (3 seeds) vs 0.739 without (room_0)
+    side: inside              # inside (only d < 0 is truncated) | both; "both" collapses: far points keep
+                              # membership >= sigmoid((offset - value) / temperature), summed over all SQs
+  membership:                 # m = sigmoid((offset - d) / temperature)
+    offset: 0.05              # surface (d = 0) -> 0.73, 5 cm inside -> 0.88, 5 cm outside -> 0.5
+    temperature: 0.05         # fixed for now
+  vote:
+    stop_gradient: false      # gradients flow through the voted SQ labels
+    eps: 1.0e-6               # denominator guard of the vote
+  nothing:
+    weight: 0.01              # claim strength of the imaginary "knows nothing" SQ (uniform label over instances)
+  label_ce:
+    weight: 1.0
+  swallow_hinge:              # penalize points deeper than delta inside their assigned SQ
+    delta: 0.05               # SuperFlex truncation
+    assignment: ownership     # d_assigned = sum_j pi_pj d_pj
+    weight: 1.0               # applied to relu(-delta - d_assigned) / delta
+  enclosure_hinge:            # counterpart: points must not lie outside their assigned SQ
+    weight: 0.0               # 0 = off; applied to relu(d_assigned - tolerance) / delta, soft-capped
+    tolerance: 0.01
+    delta: 0.05
+    cap: 10.0                 # cap * tanh(x / cap), in units of delta (far uncovered points do not dominate)
+  reverse_chamfer:            # SQ surface -> scene: union-surface samples must lie near scene points
+    weight: 1.0               # 0 = off; w=1 on room_0: surface in air 82% -> 4%, mIoU 0.757 -> 0.670
+    existence_grad: true      # false: weighted by existence, but no gradient into it (SQs must fix shape, not switch off)
+    samples_per_sq: 64        # directions (randomly rotated each step), radially projected onto each SQ
+    delta: 0.05               # allowed gap between SQ surface and scene surface
+    union_sharpness: 0.01     # a sample counts if it is outside all other SQs: prod_k (1 - e_k sigmoid(-d_k / this)), no grad
+    grid_res: 0.02            # unsigned distance grid to the scene points (EDT), trilinear lookup
+    grid_pad: 0.5
+
+structure:                    # merging and splitting of SQs (definitions in code/structure.py)
+  enabled: false
+  start: 500                  # checks at start, start + every, ..., stop
+  stop: 2500
+  every: 250
+  strong_claim: 0.5           # strong set S_j = {p : w_pj > strong_claim}
+  merge:
+    enabled: true
+    threshold: 0.5            # merge if smoothed overlap coefficient |S_i & S_j| / min(|S_i|, |S_j|) > threshold
+    ema: 0.5                  # smoothing over checks
+    same_label: true          # only SQs with the same voted instance
+  split:
+    enabled: true
+    purity_threshold: 0.7     # split if max vote share < threshold: majority-instance points vs. the rest
+    min_points: 50            # |S_j| needed to split
+    min_part_points: 10       # both halves need at least this many points
+    max_fraction: 0.1         # at most this share of SQs split per check
+  fit:                        # principal-axes fit of new SQs
+    quantile: 0.98
+    margin: 0.02
+  max_sqs_factor: 2.0         # cap on the number of SQs, relative to the initial count
+
+optim:
+  optimizer: adam
+  steps: 3000
+  schedule: cosine
+  lr:
+    translation: 0.01
+    log_scale: 0.01
+    eps: 0.02
+    rotation: 0.01
+    existence: 0.05
+
+logging:
+  snapshot_every: 100         # SQ parameters saved for the viewer's step slider
+  eval_every: 250             # metrics on all (labeled) points
+
+metrics:
+  active_existence: 0.5       # SQ counts as active if existence > this ...
+  active_min_points: 10       # ... and it owns at least this many points (argmax ownership)
+  uncovered_claim: 0.5        # point counts as uncovered if sum_j w_pj < this

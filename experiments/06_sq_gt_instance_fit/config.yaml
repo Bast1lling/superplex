@@ -1,0 +1,89 @@
+# Experiment 06: limit test. Fit K SQs to every GT instance independently, with only a forward
+# (points -> SQ union) and a backward (SQ union surface -> instance points) SDF loss.
+# No votes, no existence, no cross-instance terms. Units: meters.
+
+seed: 0
+
+data:
+  scene: room_0
+  points_dir: /home/sebastian/Documents/Uni/Thesis/data/replica_v1_points
+  tokens_dir: /home/sebastian/Documents/Uni/Thesis/data/replica_v1_sonata/stage4  # only for the frame (R, t) of the version
+  version: 0
+  drop_unlabeled: true
+
+sqs_per_instance: 6
+
+existence:                    # per-SQ existence e_j = sigmoid(logit); off = all SQs always exist
+  enabled: false
+  init: 0.9
+  fallback: 0.5               # forward value (m) with probability prod_j (1 - e_j) that no SQ of the instance exists
+
+split:                        # top-down: start with 1 SQ per instance (slots up to sqs_per_instance), split greedily
+  enabled: false
+  start: 200                  # checks at start, start + every, ..., stop
+  every: 200
+  stop: 1800
+  min_gain: 0.005             # split the SQ with the largest share of its instance's mean forward error (m),
+                              # if that share > min_gain (same scale as the parsimony weight)
+  min_points: 20              # owned points needed to split
+  verify: false               # keep a split only if, `every` steps later, the instance loss L_k (forward + backward,
+                              # all points) is lower by more than min_gain than in a shadow copy trained on the same
+                              # batches without the split; else copy the instance back from the shadow
+  retry_cooldown: 2           # checks before a rejected SQ may be proposed again
+  kmeans_iters: 15            # 2-means of the owned points, box fit per half
+
+init:                         # k-means (K clusters) per instance, principal-axes box fit per cluster
+  kmeans_iters: 25
+  kmeans_max_points: 20000    # subsample of large instances for k-means
+  quantile: 0.98              # semi-axes = quantile of |projection| + margin
+  margin: 0.0
+  eps: [1.0, 1.0]
+
+parametrization:
+  scale: {type: exp, min: 0.005, max: 5.0}
+  eps: {type: sigmoid, min: 0.1, max: 1.9}
+  rotation: quaternion
+
+sampling:
+  points_per_step: 32768
+  scheme: instance_balanced
+
+loss:
+  sdf: radial
+  forward:                    # points -> SQs of their own instance
+    mode: union_abs           # union_abs:  |softmin_j d_j|   points on the outer surface of the union
+                              # enclosure:  relu(softmin_j d_j)   points inside the union
+                              # min_abs:    softmin_j |d_j|   points on any SQ surface (internal faces allowed)
+    softmin: 0.0              # temperature of the soft minimum (m); 0 = hard min (a soft min is biased by
+                              # up to -softmin * log K where SQs touch)
+    weight: 1.0
+  backward:                   # union surface samples -> nearest point of the same instance
+    weight: 1.0
+    samples_per_sq: 64        # directions (randomly rotated each step), radially projected onto each SQ
+    union_sharpness: 0.01     # sample counts if outside the other SQs of its instance (no grad)
+    delta: 0.0                # relu(u - delta); 0 = plain distance
+    grid_res: 0.01            # per-instance unsigned distance grid (EDT), trilinear lookup
+    grid_pad: 0.2             # beyond the pad: grid value at the border + distance to the border
+  parsimony:                  # weight * mean over instances of sum_j e_j: an SQ must improve its instance's
+    weight: 0.0               # mean forward + backward error by more than this (m) to stay; needs existence
+
+optim:
+  optimizer: adam
+  steps: 2000
+  schedule: cosine
+  lr:
+    translation: 0.01
+    log_scale: 0.01
+    eps: 0.02
+    rotation: 0.01
+    existence: 0.05
+
+logging:
+  snapshot_every: 100
+  eval_every: 250
+
+metrics:
+  active_existence: 0.5       # SQ counts in evaluation if e_j > this
+  tolerance: 0.01             # enclosed: own union SDF <= tol; leaked: some foreign SQ has SDF < -tol
+  air_delta: 0.05             # union surface sample "in air" if > this from its instance's points
+  size_bins: [1000, 5000, 20000]  # instance point counts (1 cm voxels)

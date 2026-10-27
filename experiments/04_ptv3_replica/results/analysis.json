@@ -1,0 +1,402 @@
+[
+ {
+  "model": "sonata",
+  "scene": "room_0",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 444744,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 112882,
+    "purity": 0.9817063299336247,
+    "coverage": 0.9893617021276596
+   },
+   {
+    "stage": 2,
+    "tokens": 27916,
+    "purity": 0.9597903513032217,
+    "coverage": 0.9787234042553191
+   },
+   {
+    "stage": 3,
+    "tokens": 6705,
+    "purity": 0.9153468062525858,
+    "coverage": 0.8085106382978723
+   },
+   {
+    "stage": 4,
+    "tokens": 1496,
+    "purity": 0.8242359649596173,
+    "coverage": 0.6170212765957447
+   }
+  ],
+  "auc": 0.7246014402089622,
+  "auc_raw": 0.7514188426608766,
+  "pairs": 2000000,
+  "frac_same": 0.6139864921569824
+ },
+ {
+  "model": "sonata",
+  "scene": "office_3",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 547032,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 143117,
+    "purity": 0.9868910776700449,
+    "coverage": 0.9603960396039604
+   },
+   {
+    "stage": 2,
+    "tokens": 35591,
+    "purity": 0.9638101610143465,
+    "coverage": 0.8217821782178217
+   },
+   {
+    "stage": 3,
+    "tokens": 8454,
+    "purity": 0.9106779859313532,
+    "coverage": 0.7029702970297029
+   },
+   {
+    "stage": 4,
+    "tokens": 1954,
+    "purity": 0.8376091343833633,
+    "coverage": 0.5346534653465347
+   }
+  ],
+  "auc": 0.7025268751946473,
+  "auc_raw": 0.7382008325675891,
+  "pairs": 2000000,
+  "frac_same": 0.616441011428833
+ },
+ {
+  "model": "sonata",
+  "scene": "frl_apartment_0",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 809718,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 206847,
+    "purity": 0.9836041683647887,
+    "coverage": 0.9956140350877193
+   },
+   {
+    "stage": 2,
+    "tokens": 51107,
+    "purity": 0.9628030993506381,
+    "coverage": 0.9517543859649122
+   },
+   {
+    "stage": 3,
+    "tokens": 12362,
+    "purity": 0.9099637157627717,
+    "coverage": 0.7631578947368421
+   },
+   {
+    "stage": 4,
+    "tokens": 2797,
+    "purity": 0.81961868205968,
+    "coverage": 0.4605263157894737
+   }
+  ],
+  "auc": 0.7388444429835754,
+  "auc_raw": 0.765453267272232,
+  "pairs": 2000000,
+  "frac_same": 0.566647469997406
+ },
+ {
+  "model": "sonata",
+  "scene": "hotel_0",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 513830,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 129711,
+    "purity": 0.9794581865597571,
+    "coverage": 0.9602649006622517
+   },
+   {
+    "stage": 2,
+    "tokens": 31331,
+    "purity": 0.9484109530389428,
+    "coverage": 0.9205298013245033
+   },
+   {
+    "stage": 3,
+    "tokens": 7548,
+    "purity": 0.9058852149543624,
+    "coverage": 0.7086092715231788
+   },
+   {
+    "stage": 4,
+    "tokens": 1652,
+    "purity": 0.7905357803164471,
+    "coverage": 0.5364238410596026
+   }
+  ],
+  "auc": 0.7395394358585997,
+  "auc_raw": 0.7664673369111359,
+  "pairs": 2000000,
+  "frac_same": 0.5081315040588379
+ },
+ {
+  "model": "sonata",
+  "scene": "apartment_1",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 890201,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 225067,
+    "purity": 0.9857391757591825,
+    "coverage": 0.9523809523809523
+   },
+   {
+    "stage": 2,
+    "tokens": 54923,
+    "purity": 0.9571501267691229,
+    "coverage": 0.9206349206349206
+   },
+   {
+    "stage": 3,
+    "tokens": 13255,
+    "purity": 0.9072816139276411,
+    "coverage": 0.8095238095238095
+   },
+   {
+    "stage": 4,
+    "tokens": 2969,
+    "purity": 0.7885185480582475,
+    "coverage": 0.7222222222222222
+   }
+  ],
+  "auc": 0.6836415449466795,
+  "auc_raw": 0.7152366017374969,
+  "pairs": 2000000,
+  "frac_same": 0.5548744797706604
+ },
+ {
+  "model": "ptv3_scratch",
+  "scene": "room_0",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 444744,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 112882,
+    "purity": 0.9814050330077527,
+    "coverage": 1.0
+   },
+   {
+    "stage": 2,
+    "tokens": 27916,
+    "purity": 0.9596374543557642,
+    "coverage": 0.978494623655914
+   },
+   {
+    "stage": 3,
+    "tokens": 6705,
+    "purity": 0.9153198244383286,
+    "coverage": 0.8172043010752689
+   },
+   {
+    "stage": 4,
+    "tokens": 1496,
+    "purity": 0.8243034194952602,
+    "coverage": 0.6236559139784946
+   }
+  ],
+  "auc": 0.7236487924383819,
+  "auc_raw": 0.7495145851498135,
+  "pairs": 2000000,
+  "frac_same": 0.6136890053749084
+ },
+ {
+  "model": "ptv3_scratch",
+  "scene": "office_3",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 547032,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 143117,
+    "purity": 0.9867960192456748,
+    "coverage": 0.9607843137254902
+   },
+   {
+    "stage": 2,
+    "tokens": 35591,
+    "purity": 0.963673057517659,
+    "coverage": 0.8137254901960784
+   },
+   {
+    "stage": 3,
+    "tokens": 8454,
+    "purity": 0.9107054066306907,
+    "coverage": 0.696078431372549
+   },
+   {
+    "stage": 4,
+    "tokens": 1954,
+    "purity": 0.8374318138609808,
+    "coverage": 0.5392156862745098
+   }
+  ],
+  "auc": 0.6824652495426133,
+  "auc_raw": 0.7150388930494249,
+  "pairs": 2000000,
+  "frac_same": 0.6167364716529846
+ },
+ {
+  "model": "ptv3_scratch",
+  "scene": "frl_apartment_0",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 809718,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 206847,
+    "purity": 0.9835066035335759,
+    "coverage": 0.9912663755458515
+   },
+   {
+    "stage": 2,
+    "tokens": 51107,
+    "purity": 0.9629191891498028,
+    "coverage": 0.9432314410480349
+   },
+   {
+    "stage": 3,
+    "tokens": 12362,
+    "purity": 0.9100415206281693,
+    "coverage": 0.7641921397379913
+   },
+   {
+    "stage": 4,
+    "tokens": 2797,
+    "purity": 0.8196606719870375,
+    "coverage": 0.45414847161572053
+   }
+  ],
+  "auc": 0.706670036061682,
+  "auc_raw": 0.7367595548136566,
+  "pairs": 2000000,
+  "frac_same": 0.5667629837989807
+ },
+ {
+  "model": "ptv3_scratch",
+  "scene": "hotel_0",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 513830,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 129711,
+    "purity": 0.9796625343012281,
+    "coverage": 0.9602649006622517
+   },
+   {
+    "stage": 2,
+    "tokens": 31331,
+    "purity": 0.9484459840803379,
+    "coverage": 0.9337748344370861
+   },
+   {
+    "stage": 3,
+    "tokens": 7548,
+    "purity": 0.9058462915750345,
+    "coverage": 0.7086092715231788
+   },
+   {
+    "stage": 4,
+    "tokens": 1652,
+    "purity": 0.790730397213086,
+    "coverage": 0.5364238410596026
+   }
+  ],
+  "auc": 0.7292932832402242,
+  "auc_raw": 0.7575265327791685,
+  "pairs": 2000000,
+  "frac_same": 0.5086424946784973
+ },
+ {
+  "model": "ptv3_scratch",
+  "scene": "apartment_1",
+  "stages": [
+   {
+    "stage": 0,
+    "tokens": 890201,
+    "purity": 1.0,
+    "coverage": 1.0
+   },
+   {
+    "stage": 1,
+    "tokens": 225067,
+    "purity": 0.9858706067506102,
+    "coverage": 0.9448818897637795
+   },
+   {
+    "stage": 2,
+    "tokens": 54923,
+    "purity": 0.9571445100600876,
+    "coverage": 0.9212598425196851
+   },
+   {
+    "stage": 3,
+    "tokens": 13255,
+    "purity": 0.9072389269389722,
+    "coverage": 0.8031496062992126
+   },
+   {
+    "stage": 4,
+    "tokens": 2969,
+    "purity": 0.7885825785412508,
+    "coverage": 0.7165354330708661
+   }
+  ],
+  "auc": 0.755399139778355,
+  "auc_raw": 0.7727401463224309,
+  "pairs": 2000000,
+  "frac_same": 0.5552604794502258
+ }
+]
