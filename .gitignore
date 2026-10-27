@@ -218,6 +218,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-# Experiment results larger than 1MB (kept locally, not versioned)
-**/results/large_files/

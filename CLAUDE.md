@@ -1,14 +1,15 @@
-This project is my master thesis, where I want to experiment with Superquadrics as a primitive family to efficiently decompose larges point cloud scenes into meaningful parts or hierarchies. As of now, the direction this research project will take is not yet clear. Therefore, our workflow should be as follows:
+Hi Claude!
 
-1. I propose an experiment, i.e. directions I want to explore to find out if they are promising, and also to help me  better define my project.
-2. You implement this experiment according to my instructions. Focus is on fast iterations, BFS search exploring etc. A new experiment gets its subfolder in experiments/ and consists of its logic in code/, a fastAPI html (threeJS) viewer/ for me to inspect, and a folder collecting all conclusions or quantitative evaluations for documentation in results/.
-3. Successful experiments might inspire me to adopt these ideas for my project. I am not yet sure how to do this exactly, but the actual code will go into src/ and will be written by myself.
-4. Additionally, there is the papers/ directory which contains repository from related work, so we can directly compare their implementation and adopt useful ideas
-
-All datasets used can be found in .../data/ and should also be stored there. In general the focus is to keep the repository as clean as possible except for the experiment subfolders, they can be as messy as you need :)
-Result files larger than 1MB go into the experiment's results/large_files/ subdir, which is git-ignored. Code reading them must still work when they are missing.
-
-I am very open to suggestions and your opinions! Please push back on any thoughts I have if you disagree! In general, before you take decisions that will deviate from my intial idea/instructions, I prefer to be asked/informed beforehand.
-Good luck and have fun!
-
-Don't start ablations, experiments etc without asking me!
+I have 100$ in cloud credits, so I want to use them for conducting some experiments for my Master's research.
+The current problem I want to solve boils down to essentially this:
+I want to find an optimization scheme that allows me to decompose a scene into primitive shapes (mostly superquadrics). It should decompose it based on semantic labels.
+The long-term goal of this project is to train a model that can predict such decomposition with minimal input and as few test-time optimization as possible.
+However, I have not even managed yet to converge a classic optimization overfit on a single scene resulting in a satisfying decomposition.
+Thus, your job is now to try all directions you can think of to achieve a satisfying decomposition.
+The data you can test on are three downsampled replica scenes in data/.
+However, also feel free to download your own data, in the end this should also work on e.g. ScanNet, but for now Replica would already be great.
+Some more advice:
+1. Don't rely on standard metrics like CD or SDF reconstruction to judge the decomposition quality. From my experience, they could e.g. lead to decomposition containing 10000s of primitives, while I am much more interested in large, sensible decompositions a human would also make. So try to find good evaluation to judge your own progress.
+2. When researching it is worth to pursue a certain direction for a bit longer, even if it does not seem promising.
+3. Always make cheap experiments first, before trying anything time-intensive.
+4. Document whatever you try, so I can understand it later when I look at this branch.
