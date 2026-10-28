@@ -143,3 +143,26 @@ room, which collapses into a sausage-shaped blob inside the room (vIoU 0.04), an
 whole ring again, so the search never recovers.
 Fix (v6): initial boxes and add proposals use a *compact part*: recursive 2-means until the PCA box is filled to
 >= `fill_min` = 0.1 (voxel volume / box volume), largest part. On the wall ring alone: 4 slabs (one per wall), IoU 0.80.
+
+## v6 = v5 + compact-part init / proposals (fill_min 0.1)
+| run | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| room0_v5 | 136 | 1.74 | 0.830 | 0.893 | 0.882 | 0.934 | 0.710 | 0.81 | 1.0 / 1.9 / 1.8 / 2.0 | 0.80 / 0.77 / 0.85 / 0.92 |
+| room0_v6 | 135 | 1.73 | 0.833 | 0.898 | 0.887 | 0.933 | 0.724 | 0.83 | 1.0 / 1.9 / 1.8 / 2.0 | 0.80 / 0.77 / 0.87 / 0.92 |
+| room0_v5_semantic | 118 | 1.69 | 0.819 | 0.882 | 0.877 | 0.910 | 0.529 | 0.83 | 1.0 / 1.1 / 2.4 / 1.8 | 0.71 / 0.82 / 0.86 / 0.87 |
+| room0_v6_semantic | 118 | 1.69 | 0.825 | 0.886 | 0.882 | 0.912 | 0.666 | 0.84 | 1.0 / 1.1 / 2.3 / 2.0 | 0.71 / 0.82 / 0.84 / 0.92 |
+- Semantic-only: the wall-ring blob is gone, one slab per wall face; point mIoU 0.53 -> 0.67. Floor 3 slabs here.
+- Instance labels: unchanged (no ring-shaped instances there), slightly better.
+
+## Degraded input (fit on the perturbed cloud, metrics on the clean volume), room_0, v6
+mild: 5 mm position noise, 5° normal noise, 30% random dropout. strong: 1 cm, 15°, 50% dropout, 15% of points removed
+in 30 cm holes (occlusion-like).
+| run | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| clean | 135 | 1.73 | 0.833 | 0.898 | 0.887 | 0.933 | 0.724 | 0.83 | 1.0 / 1.9 / 1.8 / 2.0 | 0.80 / 0.77 / 0.87 / 0.92 |
+| mild | 128 | 1.64 | 0.740 | 0.838 | 0.835 | 0.940 | 0.726 | 0.85 | 1.0 / 1.6 / 2.1 / 1.8 | 0.62 / 0.68 / 0.81 / 0.85 |
+| strong | 130 | 1.67 | 0.689 | 0.823 | 0.797 | 0.894 | 0.631 | 0.83 | 1.0 / 1.9 / 1.8 / 1.8 | 0.60 / 0.61 / 0.74 / 0.82 |
+- The *structure* is robust: same SQ count and plausibility, render of the strong case still looks like the clean
+  one (floor 3-4 slabs, otherwise the same objects). The vIoU loss is concentrated in small objects (0.80 -> 0.60),
+  whose clean target (a few voxels, thin objects = voxels that contain points) changes under dropout; large
+  instances stay at 0.82-0.85.
