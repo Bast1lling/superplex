@@ -233,3 +233,25 @@ Unknown voxels strictly outside the room box (oriented box of the wall / floor /
 their own label EXTERIOR with full weight (w_exterior = 1); unknown *inside* the room (occluded, deep inside
 objects, the band at the room faces where window glass sits) stays cheap. The strict metric keeps weight 0.1 for
 both (identical to before, so old runs re-score the same).
+
+| run (strict weights) | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| room0_v8_planar | 112 | 1.44 | 0.784 | 0.819 | 0.952 | 0.981 | 0.539 | 0.91 | 1.0 / 1.3 / 1.8 / 1.7 | 0.87 / 0.62 / 0.84 / 0.89 |
+| room0_v9_exterior | 116 | 1.49 | 0.784 | 0.818 | 0.951 | 0.979 | 0.539 | 0.88 | 1.0 / 1.3 / 2.0 / 1.8 | 0.87 / 0.62 / 0.84 / 0.90 |
+| room1_v8_planar | 73 | 1.43 | 0.781 | 0.824 | 0.935 | 0.973 | 0.507 | 0.88 | 1.0 / 1.1 / 1.9 / 1.5 | 0.81 / 0.63 / 0.84 / 0.83 |
+| room1_v9_exterior | 75 | 1.47 | 0.783 | 0.828 | 0.927 | 0.972 | 0.510 | 0.86 | 1.0 / 1.2 / 1.8 / 1.7 | 0.81 / 0.64 / 0.84 / 0.83 |
+| office0_v8_planar | 61 | 1.53 | 0.812 | 0.850 | 0.944 | 0.950 | 0.470 | 0.88 | 1.0 / 1.0 / 2.1 / 1.8 | 0.87 / 0.82 / 0.79 / 0.76 |
+| office0_v9_exterior | 57 | 1.43 | 0.810 | 0.851 | 0.939 | 0.940 | 0.474 | **0.93** | 1.0 / 1.0 / 2.0 / 1.6 | 0.88 / 0.83 / 0.79 / 0.74 |
+- room_0 / room_1: unchanged within run-to-run variation (±4 SQs; e.g. the room_0 floor is 1 slab in v8 and 2 in
+  v9 — the floor merge decision is close to δ). **v9 is the final default.**
+- office_0 v9: 57 SQs, plausibility 0.88 -> 0.93; the front wall no longer bulges. The rug slab still pokes slightly
+  past the right wall at one corner: it lies inside the room box, but it is rotated a few degrees against the walls.
+
+## Resolution: 3 cm instead of 4 cm (`room0_v8_res3`, min_gain_vox scaled to keep ~1 l)
+| run | sqs | K/inst | vIoU (own grid) | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|
+| room0_v8_planar (4 cm) | 112 | 1.44 | 0.784 | 0.91 | 1.0 / 1.3 / 1.8 / 1.7 | 0.87 / 0.62 / 0.84 / 0.89 |
+| room0_v8_res3 (3 cm) | 112 | 1.44 | 0.764 | 0.92 | 1.0 / 1.2 / 1.8 / 1.8 | 0.85 / 0.60 / 0.81 / 0.88 |
+- Same structure (same SQ count, plausibility), 2.4x the voxels and ~1.7x the runtime -> no reason to go finer for
+  this coarse goal. Scoring the 3 cm SQs on the 4 cm grid gives 0.698 (recall 0.83): SQs fitted to 3 cm-thin
+  objects miss the shifted 4 cm voxel centers, i.e. voxel IoU across grids is unreliable for thin objects.

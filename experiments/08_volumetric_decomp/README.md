@@ -8,11 +8,12 @@
   0.83-0.86, 83% plausible**.
 - **Structure by explicit model selection** (add / split / merge / prune, each kept only if it changes the instance's
   volumetric IoU by more than δ and explains ≥ 15 voxels).
-- **Amodal completion** makes it human-like (v8, default): overlap with other instances / unknown space is cheap and
+- **Amodal completion** makes it human-like (v8; v9 = v8 + exterior label, default): overlap with other instances / unknown space is cheap and
   thin planar instances (floor, walls, windows, rugs) get the convex hull of their 2D projection as target. room_0:
   **112 SQs for 78 instances, 91% plausible**: floor 1 slab, rug 1, each wall face 1, each window 1 box in its wall,
   blinds / pictures / doors / cushions / books 1 each, chairs and sofas 1-3. room_1: 73 SQs / 51 instances, 88%.
-  Renders: `results/runs/*/render.jpg` (start with `room0_v8_planar`, `room1_v8_planar`).
+  office_0 (v9): 57 SQs / 40 instances, 93%. Renders: `results/runs/*/render.jpg` (start with `room0_v8_planar`,
+  `room1_v8_planar`, `office0_v9_exterior`).
 - Works with **semantic labels only** (pseudo-instances = connected components per class; v6: vIoU 0.825) and is
   robust in structure to scan-like degradation (50% dropout, holes, 1 cm noise, 15° normal noise: same SQ count
   and plausibility, vIoU 0.83 -> 0.69, mostly on small objects).
@@ -25,7 +26,7 @@
   compact-part proposals; (6) strict vIoU against the visible volume penalizes amodal completion — judge with the
   plausibility proxy + renders.
 
-Best config = defaults in `code/fit.py` (v8). Runtime on this CPU-only box: ~20 min per room with 2 threads.
+Best config = defaults in `code/fit.py` (v9). Runtime on this CPU-only box: ~20 min per room with 2 threads.
 
 **Question.** Can a classic per-scene optimization produce a *sensible, human-like* decomposition of a Replica
 scene into few superquadrics (SQs), each belonging to one semantic instance?
@@ -71,7 +72,18 @@ Standard CD / SDF error rewards patchwork, so the main numbers are *per-instance
 
 Size bins are in 2 cm points: < 250 / 250–1250 / 1250–5000 / > 5000 (≈ 1k / 5k / 20k at 1 cm as in 06).
 
-## Runs
-See `results/notes.md` for the log of runs and observations.
+## Files
+- `code/volume.py` scene loading (instance or semantic labels, scan-like degradation), labeled voxel volume.
+- `code/fit.py` greedy volumetric fitter (main method; defaults = best config). `code/fit_exist.py` fixed slots +
+  existence + parsimony variant. `code/sq.py` SQ parameters / SDF.
+- `code/evaluate.py` metrics + renders, `code/plausible.py` plausible-K table, `code/compare.py` run table,
+  `code/reeval.py` re-score runs with the strict metric weights, `code/eval_external.py` score experiment 06's
+  snapshots, `code/rerender.py`, `code/export_viewer.py` + `viewer/server.py` (06's viewer on these runs; untested
+  here because it needs the user's data paths / trackio).
+- `results/runs/<run>/`: config.json, metrics.json (+ metrics_std.json = strict re-score), sqs.npz (final SQs:
+  trans, rot (local-to-world columns), scale, eps, instance index; instance_ids), render.jpg.
+- `results/notes.md`: chronological log of all runs and observations.
 
-    cd code && python fit.py --name <run> [--set key=value ...]     # defaults in fit.py: CFG
+    cd code && python fit.py --name <run> [--set key=value ...]     # e.g. --set scene=room_1 --set labels=semantic
+    python compare.py <run> ...                                     # summary table
+The volume cache goes to /tmp/claude-0/volcache (~30 s per scene to rebuild).

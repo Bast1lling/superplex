@@ -1,7 +1,7 @@
 """Re-score a run's SQs with the strict metric weights (w_free 1, w_other 0.3, w_unknown 0.1, no planar completion), so runs
 fitted with other loss weights are comparable. Writes results/runs/<run>/metrics_std.json.
 
-    python reeval.py <run> [<run> ...]
+    python reeval.py <run> [<run> ...] [--res=0.04]   (--res: score on another grid -> metrics_std_res<r>.json)
 """
 
 import json
@@ -19,10 +19,12 @@ from volume import load_scene
 METRIC = dict(w_free=1.0, w_other=0.3, w_unknown=0.1, w_exterior=0.1, fill_planar=False)  # strict metric weights
 
 
-def reeval(name):
+def reeval(name, res=None, suffix=""):
     run = RUNS / name
     rcfg = json.loads((run / "config.json").read_text())
     cfg = dict(CFG) | {k: rcfg[k] for k in ("scene", "labels", "res", "min_points") if k in rcfg} | METRIC
+    if res is not None:  # score on another voxel grid (e.g. a 3 cm run on the common 4 cm grid)
+        cfg["res"] = res
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"], labels=cfg["labels"])
     vol = cached_volume(cfg, sc, "clean2")
     D = prepare(cfg, sc, vol)
@@ -43,11 +45,13 @@ def reeval(name):
             slot[i] += 1
     ev = evaluate(model, D)
     M = metrics(cfg, sc, vol, D, s, ev)
-    (run / "metrics_std.json").write_text(json.dumps({"name": name, "summary": M["summary"],
+    (run / f"metrics_std{suffix}.json").write_text(json.dumps({"name": name, "summary": M["summary"],
                                                       "per_instance": M["per_instance"]}, indent=1))
     print(name, {k: round(v, 3) for k, v in M["summary"].items() if isinstance(v, float)})
 
 
 if __name__ == "__main__":
-    for n in sys.argv[1:]:
-        reeval(n)
+    args = [a for a in sys.argv[1:] if not a.startswith("--res=")]
+    res = [float(a[6:]) for a in sys.argv[1:] if a.startswith("--res=")]
+    for n in args:
+        reeval(n, res[0] if res else None, f"_res{res[0]}" if res else "")
