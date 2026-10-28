@@ -26,7 +26,7 @@ def main():
     args = ap.parse_args()
     cfg = dict(CFG)
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"])
-    vol = dict(np.load(f"/tmp/claude-0/volcache/{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_instance_v2.npz"))
+    vol = dict(np.load(f"/tmp/claude-0/volcache/{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_instance_clean.npz"))
     vol["res"] = float(vol["res"])
     s = np.load(args.snapshots)
     R, t = s["R"], s["t"]

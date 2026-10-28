@@ -123,3 +123,23 @@ it makes over-splitting visible, which vIoU rewards. Shown in `compare.py` outpu
 - Fix: cosine lr decay to 5% within every round, so each decision compares settled states. On the subset the IoU
   now rises monotonically over the rounds and ends at 0.83 with 11 SQs (before: ~0.80 with fluctuations).
 - v4 (= v3 + min_gain_vox 15) runs were stopped in favour of v5 = v3 + min_gain_vox 15 + merge + lr decay.
+
+## v5 = v3 + min_gain_vox 15 + merge move + per-round lr decay
+| run | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| room0_v3 | 147 | 1.89 | 0.833 | 0.895 | 0.887 | 0.918 | 0.687 | 0.74 | 1.5 / 2.2 / 1.8 / 1.8 | 0.88 / 0.73 / 0.86 / 0.91 |
+| room0_v5 | 136 | 1.74 | 0.830 | 0.893 | 0.882 | 0.934 | 0.710 | 0.81 | 1.0 / 1.9 / 1.8 / 2.0 | 0.80 / 0.77 / 0.85 / 0.92 |
+| room1_v3 | 95 | 1.86 | 0.814 | 0.875 | 0.869 | 0.908 | 0.643 | 0.63 | 1.8 / 1.5 / 2.0 / 2.1 | 0.88 / 0.64 / 0.86 / 0.87 |
+| room1_v5 | 84 | 1.65 | 0.805 | 0.866 | 0.866 | 0.902 | 0.627 | 0.78 | 1.0 / 1.4 / 1.9 / 1.9 | 0.83 / 0.64 / 0.85 / 0.88 |
+| office0_v2 | 74 | 1.85 | 0.872 | 0.927 | 0.928 | 0.946 | 0.583 | 0.65 | 1.6 / 1.5 / 2.2 / 2.0 | 0.93 / 0.93 / 0.83 / 0.82 |
+| office0_v5 | 65 | 1.63 | 0.868 | 0.928 | 0.923 | 0.957 | 0.574 | 0.82 | 1.0 / 1.5 / 2.3 / 1.8 | 0.90 / 0.94 / 0.84 / 0.83 |
+- Consistent on all scenes: fewer SQs, same vIoU, plausibility 0.63-0.74 -> 0.78-0.82. Small objects get exactly 1
+  SQ. room_0 render: floor still 2 slabs, one cushion an elongated sliver; otherwise clean.
+
+## Semantic labels only (`labels=semantic`: pseudo-instances = connected components of each class, 5 cm)
+room_0: 70 components (78 GT instances). `room0_v5_semantic`: 118 SQs, vIoU 0.819, plausible 0.83 — close to the
+instance run, *except* one failure: all walls are one ring-shaped component (77k points); its PCA box is the whole
+room, which collapses into a sausage-shaped blob inside the room (vIoU 0.04), and every "add" proposal box-fits the
+whole ring again, so the search never recovers.
+Fix (v6): initial boxes and add proposals use a *compact part*: recursive 2-means until the PCA box is filled to
+>= `fill_min` = 0.1 (voxel volume / box volume), largest part. On the wall ring alone: 4 slabs (one per wall), IoU 0.80.

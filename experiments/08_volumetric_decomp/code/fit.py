@@ -29,7 +29,7 @@ import torch
 from scipy import ndimage
 from sklearn.cluster import KMeans
 
-from volume import FREE, UNKNOWN, build_volume, load_scene
+from volume import FREE, UNKNOWN, build_volume, load_scene, perturb
 from sq import SQSet, sdf_slots, sdf_radial
 
 EXP = Path(__file__).resolve().parents[1]
@@ -41,7 +41,8 @@ CFG = dict(
     w_free=1.0, w_other=0.3, w_unknown=0.1, w_region=10.0,
     samples_pos=512, samples_neg=1024, tau=0.02, tau_final=0.01,
     lr=0.01, lr_decay=True, steps_init=400, steps_round=250, rounds=8, steps_final=300,
-    delta=0.03, prune_delta=0.03, max_fail=3, merge_rounds=2, prune_rounds=3, min_gain_vox=15.0, min_comp=4,
+    delta=0.03, prune_delta=0.03, max_fail=3, merge_rounds=2, prune_rounds=3, min_gain_vox=15.0, fill_min=0.1, min_comp=4,
+    noise=0.0, normal_deg=0.0, drop=0.0, holes=0.0,   # scan-like degradation of the input (evaluated on clean)
     eps_init=0.5, eps_max=1.2, steps_warm=100, seed=0, only="", verbose=False,
 )
 
@@ -54,6 +55,18 @@ def parse_set(cfg, items):
 
 
 # ---------------------------------------------------------------- data
+
+def cached_volume(cfg, sc, tag):
+    cache = Path("/tmp/claude-0/volcache") / f"{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_{cfg['labels']}_{tag}.npz"
+    if cache.exists():
+        vol = dict(np.load(cache))
+        vol["res"] = float(vol["res"])
+        return vol
+    vol = build_volume(sc, res=cfg["res"])
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(cache, **vol)
+    return vol
+
 
 def prepare(cfg, sc, vol):
     """Flat target / negative voxel arrays per instance."""
@@ -177,6 +190,18 @@ def box_fit(x, res):
     return mu, R, (hi - lo) / 2 + res / 2
 
 
+def compact_part(x, res, fill_min, rng, depth=0):
+    """Largest part of x whose PCA box is filled to >= fill_min (recursive 2-means), so that ring- or L-shaped
+    voxel sets (all walls of a room, an L-shaped wall) are not fitted by one room-sized box."""
+    t, R, a = box_fit(x, res)
+    fill = len(x) * res ** 3 / np.prod(2 * a)
+    if fill >= fill_min or len(x) < 16 or depth >= 6:
+        return x
+    lab = KMeans(2, n_init=2, random_state=int(rng.integers(1 << 30))).fit_predict(x)
+    parts = [compact_part(x[lab == c], res, fill_min, rng, depth + 1) for c in (0, 1)]
+    return max(parts, key=len)
+
+
 def largest_component(vox):
     a = vox.min(0)
     grid = np.zeros(vox.max(0) - a + 1, bool)
@@ -210,7 +235,8 @@ def propose(cfg, model, D, ev, i, rng, flip=False):
     if flip:  # after a failed proposal try the other kind first
         prefer_add = not prefer_add
     if can_add and (prefer_add or slot_fp[j] <= 0):
-        t, R, a = box_fit(x[uncovered][comp], res)
+        part = compact_part(x[uncovered][comp], res, cfg["fill_min"], rng)
+        t, R, a = box_fit(part, res)
         return ("add", [(int(free[0]), t, R, a)])
     owned = (dp.argmin(1).numpy() == j) & (dp[:, j] < 0).numpy()
     if slot_fp[j] > 0 and owned.sum() >= 8:
@@ -280,21 +306,21 @@ def run(cfg, name):
     g = torch.Generator().manual_seed(cfg["seed"])
     rng = np.random.default_rng(cfg["seed"])
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"], labels=cfg["labels"])
-    cache = Path("/tmp/claude-0/volcache") / f"{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_{cfg['labels']}_v2.npz"
-    if cache.exists():
-        vol = dict(np.load(cache))
-        vol["res"] = float(vol["res"])
-    else:
-        vol = build_volume(sc, res=cfg["res"])
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(cache, **vol)
+    vol = cached_volume(cfg, sc, "clean")
     D = prepare(cfg, sc, vol)
+    D_eval = None
+    degraded = any(cfg[k] > 0 for k in ("noise", "normal_deg", "drop", "holes"))
+    if degraded:  # fit on the degraded input, report metrics on the clean volume
+        D_eval = D
+        sp = perturb(sc, cfg["noise"], cfg["normal_deg"], cfg["drop"], cfg["holes"], seed=cfg["seed"])
+        tag = f"n{cfg['noise']}_a{cfg['normal_deg']}_d{cfg['drop']}_h{cfg['holes']}"
+        D = prepare(cfg, sp, cached_volume(cfg, sp, tag))
     I, K = D["I"], cfg["K"]
     print(f"{I} instances, {len(D['pos_x'])} target voxels, {len(D['neg_x'])} negatives, prep {time.time() - t0:.0f} s")
     model = SQSet(I, K, eps_range=(0.1, cfg["eps_max"]))
     for i in range(I):
         x = D["pos_x"][D["pos_i"] == i].numpy()
-        t, R, a = box_fit(x, cfg["res"])
+        t, R, a = box_fit(compact_part(x, cfg["res"], cfg["fill_min"], rng), cfg["res"])
         model.set_slot(i, 0, t, R, a, (cfg["eps_init"], cfg["eps_init"]))
     optimize(cfg, model, D, cfg["steps_init"], g, cfg["tau"], cfg["lr"])
     ev = evaluate(model, D)
@@ -398,6 +424,9 @@ def run(cfg, name):
     ev = evaluate(model, D)
     log.append({"round": "final", "iou": ev["iou"].mean().item(), "sqs": int(model.active.sum()), "t": time.time() - t0})
     print(log[-1])
+    if D_eval is not None:
+        ev = evaluate(model, D_eval)
+        D = D_eval
     return sc, vol, D, model, ev, log
 
 

@@ -40,6 +40,33 @@ def semantic_components(pos: np.ndarray, lab: np.ndarray, radius: float = 0.05) 
     return out
 
 
+def perturb(sc: dict, noise: float = 0.0, normal_deg: float = 0.0, drop: float = 0.0, holes: float = 0.0,
+            hole_radius: float = 0.3, seed: int = 0) -> dict:
+    """Scan-like degradation: Gaussian position noise (m), normal noise (deg), random dropout (share of points),
+    and occlusion-like holes (balls of hole_radius around random points until `holes` of the points are gone).
+    Every instance keeps at least 5 points, so the instance list is unchanged."""
+    rng = np.random.default_rng(seed)
+    n = len(sc["pos"])
+    keep = rng.random(n) >= drop
+    if holes > 0:
+        tree = cKDTree(sc["pos"])
+        gone = np.zeros(n, bool)
+        while gone.mean() < holes:
+            c = sc["pos"][rng.integers(n)]
+            gone[tree.query_ball_point(c, hole_radius)] = True
+        keep &= ~gone
+    for k in range(len(sc["instance_ids"])):
+        idx = np.nonzero(sc["y"] == k)[0]
+        if keep[idx].sum() < 5:
+            keep[idx[:5]] = True
+    out = {k: (v[keep] if isinstance(v, np.ndarray) and len(v) == n else v) for k, v in sc.items()}
+    out["pos"] = out["pos"] + rng.normal(0, noise, out["pos"].shape).astype(np.float32)
+    if normal_deg > 0:
+        nn = out["nrm"] + rng.normal(0, np.radians(normal_deg), out["nrm"].shape)
+        out["nrm"] = (nn / np.linalg.norm(nn, axis=1, keepdims=True)).astype(np.float32)
+    return out
+
+
 def load_scene(scene: str, drop_unlabeled: bool = True, min_points: int = 1, labels: str = "instance") -> dict:
     """labels: "instance" (GT instances) or "semantic" (connected components of each GT class)."""
     d = np.load(DATA / "replica_v1_points" / f"{scene}_voxel20mm.npz")
