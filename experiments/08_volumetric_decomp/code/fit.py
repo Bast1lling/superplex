@@ -2,13 +2,15 @@
 
     python fit.py --name room0_base [--set key=value ...]
 
-Per instance k (GT instance labels), target = the instance's solid voxels T_k (volume.py), negatives = free voxels
-and other instances' solid voxels in the instance's box + margin (unknown voxels are ignored). The union of the
+Per instance k (GT instance or semantic-component labels), target = the instance's solid voxels T_k (volume.py; thin
+planar instances additionally get their amodally completed plane, fill_planar), negatives = all other voxels in the
+instance's box + margin, weighted by label (free 1, other instance w_other, unknown w_unknown, exterior w_exterior;
+cheap overlap = amodal completion). The union of the
 instance's SQs is fitted with a logistic occupancy loss on the union SDF d = min_j d_j:
     L_k = [ sum_T softplus(d / tau) + sum_N w softplus(-d / tau) ] / |T_k|
 (linear in the distance far from the boundary, so targets far outside / negatives deep inside always pull).
 
-Structure (greedy, all instances in parallel): start with 1 SQ (PCA box of T_k). Each round proposes one change per
+Structure (greedy, all instances in parallel): start with 1 SQ (PCA box of the largest compact part of T_k). Each round proposes one change per
 instance: *add* an SQ on the largest connected component of uncovered target voxels, or *split* the SQ that covers
 the most negatives (2-means of its target voxels). After `steps_round` joint steps the change is kept only if the
 instance's hard volumetric IoU rose by more than `delta`; otherwise the instance is restored. Finally SQs whose
