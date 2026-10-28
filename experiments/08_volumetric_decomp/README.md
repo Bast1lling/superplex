@@ -4,21 +4,28 @@
 - **Fit SQs to volumes, not to surfaces.** Per-instance *solid* voxels are derived from the oriented points
   (behind-the-surface test), and every instance's SQ union is fitted with a logistic occupancy loss against its own
   voxels vs. free space / other instances. Experiment 06's best surface fit scored with the same metrics:
-  307 SQs, vIoU 0.37, 24% plausible primitive counts; this experiment (v6): **135 SQs, vIoU 0.83, 83% plausible**.
+  307 SQs, vIoU 0.37, 24% plausible primitive counts; this experiment (v6/v7, room_0): **133-135 SQs, vIoU
+  0.83-0.86, 83% plausible**.
 - **Structure by explicit model selection** (add / split / merge / prune, each kept only if it changes the instance's
-  volumetric IoU by more than δ and explains ≥ 15 voxels). Result on room_0: floor 1-2 slabs, every wall face one
-  slab, blinds / pictures / doors / cushions / books one SQ each, chairs and sofas 1-3. Renders: `results/runs/*/render.jpg`.
-- Works on all three scenes (room_1: 84 SQs / 51 instances, office_0: 65 / 40) and with **semantic labels only**
-  (pseudo-instances = connected components per class): room_0 118 SQs, vIoU 0.825.
+  volumetric IoU by more than δ and explains ≥ 15 voxels).
+- **Amodal completion** makes it human-like (v8, default): overlap with other instances / unknown space is cheap and
+  thin planar instances (floor, walls, windows, rugs) get the convex hull of their 2D projection as target. room_0:
+  **112 SQs for 78 instances, 91% plausible**: floor 1 slab, rug 1, each wall face 1, each window 1 box in its wall,
+  blinds / pictures / doors / cushions / books 1 each, chairs and sofas 1-3. room_1: 73 SQs / 51 instances, 88%.
+  Renders: `results/runs/*/render.jpg` (start with `room0_v8_planar`, `room1_v8_planar`).
+- Works with **semantic labels only** (pseudo-instances = connected components per class; v6: vIoU 0.825) and is
+  robust in structure to scan-like degradation (50% dropout, holes, 1 cm noise, 15° normal noise: same SQ count
+  and plausibility, vIoU 0.83 -> 0.69, mostly on small objects).
 - **Fixed slots + existence + parsimony** (what a feed-forward model would be trained with) reaches the same
   budget / quality with this loss, but cannot *merge*: large instances stay as 2-5 slabs. The search results are
   therefore the better pseudo-targets for a network for now.
-- Key lessons: (1) amodal overlap must be cheap (rug on floor, picture on wall); (2) free space seen through windows
-  is not observed; (3) decisions must compare *settled* states (lr decay per round) — constant-lr jitter was as large
-  as δ; (4) IoU-relative prices over-split tiny objects, add an absolute minimum volume; (5) ring / L-shaped instances
-  need compact-part proposals.
+- Key lessons: (1) amodal overlap must be cheap and planar holes filled; (2) free space seen through windows is not
+  observed; (3) decisions must compare *settled* states (lr decay per round) — constant-lr jitter was as large as δ;
+  (4) IoU-relative prices over-split tiny objects, add an absolute minimum volume; (5) ring / L-shaped instances need
+  compact-part proposals; (6) strict vIoU against the visible volume penalizes amodal completion — judge with the
+  plausibility proxy + renders.
 
-Best config = defaults in `code/fit.py` (v6). Runtime on this CPU-only box: ~20 min per room with 2 threads.
+Best config = defaults in `code/fit.py` (v8). Runtime on this CPU-only box: ~20 min per room with 2 threads.
 
 **Question.** Can a classic per-scene optimization produce a *sensible, human-like* decomposition of a Replica
 scene into few superquadrics (SQs), each belonging to one semantic instance?

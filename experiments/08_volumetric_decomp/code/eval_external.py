@@ -14,6 +14,7 @@ import torch
 
 from evaluate import metrics, render_all
 from fit import CFG, RUNS, prepare, evaluate
+from reeval import METRIC
 from sq import SQSet, matrix_to_quat
 from volume import load_scene
 
@@ -24,7 +25,7 @@ def main():
     ap.add_argument("name")
     ap.add_argument("--sqs-per-instance", type=int, default=6)
     args = ap.parse_args()
-    cfg = dict(CFG)
+    cfg = dict(CFG) | METRIC
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"])
     vol = dict(np.load(f"/tmp/claude-0/volcache/{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_instance_clean.npz"))
     vol["res"] = float(vol["res"])

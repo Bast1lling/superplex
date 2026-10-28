@@ -182,3 +182,40 @@ What is still over-split (K above my plausible range):
 - chairs with 4 SQs (seat, back, two arms): arguably plausible, my table says <= 3.
 -> v7: cheaper amodal overlap (w_other 0.1, w_unknown 0.03). Because vIoU depends on these weights, runs with other
 weights are re-scored with the default weights (`code/reeval.py`, `metrics_std.json`; compare.py prefers it).
+
+## v7: cheap amodal overlap (w_other 0.1, w_unknown 0.03); scored with the default weights
+| run | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| room0_v6 | 135 | 1.73 | 0.833 | 0.898 | 0.887 | 0.933 | 0.724 | 0.83 | 1.0 / 1.9 / 1.8 / 2.0 | 0.80 / 0.77 / 0.87 / 0.92 |
+| room0_v7 | 133 | 1.71 | 0.855 | 0.892 | 0.946 | 0.968 | 0.688 | 0.83 | 1.0 / 2.0 / 1.8 / 1.8 | 0.87 / 0.80 / 0.86 / 0.91 |
+| room1_v6 | 91 | 1.78 | 0.832 | 0.897 | 0.898 | 0.934 | 0.634 | 0.75 | 1.0 / 1.9 / 1.9 / 2.0 | 0.83 / 0.76 / 0.85 / 0.87 |
+| room1_v7 | 83 | 1.63 | 0.837 | 0.885 | 0.934 | 0.965 | 0.653 | 0.80 | 1.0 / 1.8 / 1.8 / 1.7 | 0.81 / 0.80 / 0.84 / 0.88 |
+- Better on both scenes even under the stricter default weights (recall up, precision slightly down).
+- room_0 floor: 1 slab. room_1 floor still 4, windows still 4 bars each (frame instances: the glass is not a target,
+  so one box over the frame is never better than four bars).
+
+## v8: amodal planar completion of the targets (`fill_planar`)
+Thin planar instances (PCA thickness < 20 cm, size > 50 cm) get the cells inside the 2D convex hull of their
+projection as extra targets (with their 5-95% thickness): floor under rug / furniture, window glass, wall behind
+windows and pictures. (Plain 2D hole filling was tried first: it misses holes that touch the border, e.g. the floor
+under a sofa that stands at the wall, and open window frames.) On room_0 it adds e.g. 4.7k voxels per window
+(frame had ~370), 28k to the floor (21k), 10.8k to a wall with windows. Run with the v7 weights.
+
+| run (scored with the strict default weights) | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| room0_v7 | 133 | 1.71 | 0.855 | 0.892 | 0.946 | 0.968 | 0.688 | 0.83 | 1.0 / 2.0 / 1.8 / 1.8 | 0.87 / 0.80 / 0.86 / 0.91 |
+| room0_v8_planar | 112 | 1.44 | 0.784 | 0.819 | 0.952 | 0.981 | 0.539 | **0.91** | 1.0 / 1.3 / 1.8 / 1.7 | 0.87 / 0.62 / 0.84 / 0.89 |
+| room1_v7 | 83 | 1.63 | 0.837 | 0.885 | 0.934 | 0.965 | 0.653 | 0.80 | 1.0 / 1.8 / 1.8 / 1.7 | 0.81 / 0.80 / 0.84 / 0.88 |
+| room1_v8_planar | 73 | 1.43 | 0.781 | 0.824 | 0.935 | 0.973 | 0.507 | **0.88** | 1.0 / 1.1 / 1.9 / 1.5 | 0.81 / 0.63 / 0.84 / 0.83 |
+- Renders: the most human-like decompositions so far. room_0: floor 1 slab, rug 1, each window **one box set into
+  its wall**, each wall face one slab; room_1: each window / door one box, floor 1 large slab.
+- The strict metric drops (0.855 -> 0.784) *because* of the amodal completion it was designed to reward: the window
+  box covers unscanned glass (free / unknown voxels), the floor slab passes under the rug and furniture (other
+  instances), which the strict vIoU counts as false positives; mid-size bin (windows) 0.80 -> 0.62. Point mIoU drops
+  for the same reason (rug points are inside the floor slab). I.e. vIoU against the *visible* volume is the wrong
+  yardstick for amodal decompositions; the plausibility proxy and the renders say v8 is better.
+- Renderer fix: flat SQs with ε1 > 1 showed concentric rings (side faces sampled with too few rows; the radially
+  projected top face shrinks inwards). Now every face is sampled with as many rows as the largest extent; key runs
+  were re-rendered (`code/rerender.py`).
+- **v8 is now the default** (`fit.py` CFG: w_other 0.1, w_unknown 0.03, fill_planar on). Strict metric weights are
+  fixed in `reeval.py` (METRIC) and used by `eval_external.py`; `fit_exist.py` keeps the weights of its runs.

@@ -24,7 +24,8 @@ from fit import CFG, RUNS, box_fit, evaluate, parse_set, prepare, sample, save
 from sq import SQSet, sdf_slots
 from volume import build_volume, load_scene
 
-XCFG = dict(CFG) | dict(init="kmeans", K=8, lam=0.1, steps=3000, exist_init=0.9, lr_exist=0.05, fallback=0.3, anneal=True)
+XCFG = dict(CFG) | dict(w_other=0.3, w_unknown=0.1, fill_planar=False,  # settings of the runs in notes.md
+                        init="kmeans", K=8, lam=0.1, steps=3000, exist_init=0.9, lr_exist=0.05, fallback=0.3, anneal=True)
 
 
 def expected(d, e, inst, loss_fn, fallback_val):

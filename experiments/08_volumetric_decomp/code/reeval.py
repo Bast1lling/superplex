@@ -1,4 +1,4 @@
-"""Re-score a run's SQs with the default metric weights (fit.CFG: w_free 1, w_other 0.3, w_unknown 0.1), so runs
+"""Re-score a run's SQs with the strict metric weights (w_free 1, w_other 0.3, w_unknown 0.1, no planar completion), so runs
 fitted with other loss weights are comparable. Writes results/runs/<run>/metrics_std.json.
 
     python reeval.py <run> [<run> ...]
@@ -16,10 +16,13 @@ from sq import SQSet, matrix_to_quat
 from volume import load_scene
 
 
+METRIC = dict(w_free=1.0, w_other=0.3, w_unknown=0.1, fill_planar=False)  # strict metric weights
+
+
 def reeval(name):
     run = RUNS / name
     rcfg = json.loads((run / "config.json").read_text())
-    cfg = dict(CFG) | {k: rcfg[k] for k in ("scene", "labels", "res", "min_points") if k in rcfg}
+    cfg = dict(CFG) | {k: rcfg[k] for k in ("scene", "labels", "res", "min_points") if k in rcfg} | METRIC
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"], labels=cfg["labels"])
     vol = cached_volume(cfg, sc, "clean")
     D = prepare(cfg, sc, vol)

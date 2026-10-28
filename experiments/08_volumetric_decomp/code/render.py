@@ -97,8 +97,9 @@ def sq_surface(scale, eps, rot, trans, spacing=0.015):
     pts = []
     for ax in range(3):
         o = [i for i in range(3) if i != ax]
-        n0 = max(2, int(2 * a[o[0]] / spacing))
-        n1 = max(2, int(2 * a[o[1]] / spacing))
+        # dense on every face: for flat shapes with e1 > 1 the radial projection pulls the top face inwards and the
+        # rim is covered by the side faces, which need as many rows as the largest extent (else: ring artifacts)
+        n0 = n1 = max(2, int(2 * a.max() / spacing))
         u, v = np.meshgrid(np.linspace(-1, 1, n0), np.linspace(-1, 1, n1), indexing="ij")
         for s in (-1, 1):
             c = np.zeros((u.size, 3))
