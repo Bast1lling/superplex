@@ -42,6 +42,7 @@ CFG = dict(
     samples_pos=512, samples_neg=1024, tau=0.02, tau_final=0.01,
     lr=0.01, lr_decay=True, steps_init=400, steps_round=250, rounds=8, steps_final=300,
     delta=0.03, prune_delta=0.03, max_fail=3, merge_rounds=2, prune_rounds=3, min_gain_vox=15.0, fill_min=0.1, min_comp=4,
+    fill_planar=False, planar_thick=0.2, planar_min=0.5,
     noise=0.0, normal_deg=0.0, drop=0.0, holes=0.0,   # scan-like degradation of the input (evaluated on clean)
     eps_init=0.5, eps_max=1.2, steps_warm=100, seed=0, only="", verbose=False,
 )
@@ -68,6 +69,41 @@ def cached_volume(cfg, sc, tag):
     return vol
 
 
+def fill_planar(vox, res, thick, min_size):
+    """Amodal completion of thin planar instances (floor, walls, windows, rugs, pictures): if the PCA box of the
+    voxels is thinner than `thick` and larger than `min_size`, the 2D holes of its projection onto its plane (floor
+    under furniture, unscanned window glass, wall behind a picture) are filled; the new cells get the instance's
+    5-95% thickness range. Holes = cells inside the 2D convex hull of the projection (plain hole filling misses holes
+that touch the border, e.g. floor under a sofa standing at the wall, or open window frames). Returns the extra voxel indices (may overlap other instances: amodal targets)."""
+    if len(vox) < 20:
+        return np.zeros((0, 3), int)
+    x = vox.astype(float)
+    mu = x.mean(0)
+    _, vec = np.linalg.eigh((x - mu).T @ (x - mu))
+    q = (x - mu) @ vec  # columns ascending: q[:, 0] is the thin axis
+    ext = (q.max(0) - q.min(0)) * res
+    if ext[0] > thick or ext[2] < min_size:
+        return np.zeros((0, 3), int)
+    uv = np.round(q[:, 1:] - q[:, 1:].min(0)).astype(int)
+    grid = np.zeros(uv.max(0) + 1, bool)
+    grid[uv[:, 0], uv[:, 1]] = True
+    from scipy.spatial import Delaunay
+    try:
+        hull = Delaunay(np.unique(uv, axis=0))
+    except Exception:  # degenerate (collinear) projection
+        return np.zeros((0, 3), int)
+    allc = np.argwhere(np.ones_like(grid))
+    filled = (hull.find_simplex(allc) >= 0).reshape(grid.shape) & ~grid
+    cells = np.argwhere(filled)
+    if len(cells) == 0:
+        return np.zeros((0, 3), int)
+    w = np.arange(np.floor(np.quantile(q[:, 0], 0.05)), np.ceil(np.quantile(q[:, 0], 0.95)) + 1)
+    c = cells + q[:, 1:].min(0)
+    pts = np.concatenate([np.column_stack([np.full(len(c), wi), c]) for wi in w])
+    new = np.round(pts @ vec.T + mu).astype(int)
+    return np.unique(new, axis=0)
+
+
 def prepare(cfg, sc, vol):
     """Flat target / negative voxel arrays per instance."""
     L, lo, res, dims = vol["label"], vol["lo"], vol["res"], vol["dims"]
@@ -83,13 +119,20 @@ def prepare(cfg, sc, vol):
         vox = np.argwhere(L == k)
         if len(vox) == 0:  # fully overwritten: use the voxels of its points
             vox = np.unique(np.clip(np.round((sc["pos"][sc["y"] == k] - lo) / res).astype(int), 0, dims - 1), axis=0)
+        if cfg["fill_planar"]:
+            extra = fill_planar(vox, res, cfg["planar_thick"], cfg["planar_min"])
+            extra = extra[((extra >= 0) & (extra < dims)).all(1)]
+            if len(extra):
+                vox = np.unique(np.concatenate([vox, extra]), axis=0)
         pos_x.append(lo + vox * res), pos_i.append(np.full(len(vox), ii)), pos_v.append(vox)
         n_pos[ii] = len(vox)
         m = int(np.ceil(cfg["margin"] / res))
         a, b = np.maximum(vox.min(0) - m, 0), np.minimum(vox.max(0) + m + 1, dims)
         sub = L[a[0]:b[0], a[1]:b[1], a[2]:b[2]]
         region_lo.append((lo + a * res)[None]), region_hi.append((lo + (b - 1) * res)[None])
-        neg = np.argwhere((sub != k) & ((sub != UNKNOWN) | (cfg["w_unknown"] > 0))) + a
+        own = np.zeros(sub.shape, bool)
+        own[tuple((vox - a).T)] = True
+        neg = np.argwhere((sub != k) & ~own & ((sub != UNKNOWN) | (cfg["w_unknown"] > 0))) + a
         lab = sub[tuple((neg - a).T)]
         w = np.select([lab == FREE, lab == UNKNOWN], [cfg["w_free"], cfg["w_unknown"]], cfg["w_other"]).astype(np.float32)
         if len(neg) > cfg["max_neg"]:

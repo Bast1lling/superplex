@@ -166,3 +166,19 @@ in 30 cm holes (occlusion-like).
   one (floor 3-4 slabs, otherwise the same objects). The vIoU loss is concentrated in small objects (0.80 -> 0.60),
   whose clean target (a few voxels, thin objects = voxels that contain points) changes under dropout; large
   instances stay at 0.82-0.85.
+
+## v6 on all scenes (current default config)
+| run | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| room0_v6 | 135 | 1.73 | 0.833 | 0.898 | 0.887 | 0.933 | 0.724 | 0.83 | 1.0 / 1.9 / 1.8 / 2.0 | 0.80 / 0.77 / 0.87 / 0.92 |
+| room1_v6 | 91 | 1.78 | 0.832 | 0.897 | 0.898 | 0.934 | 0.634 | 0.75 | 1.0 / 1.9 / 1.9 / 2.0 | 0.83 / 0.76 / 0.85 / 0.87 |
+| office0_v6 | 67 | 1.68 | 0.870 | 0.929 | 0.925 | 0.958 | 0.576 | 0.82 | 1.0 / 1.5 / 2.4 / 1.9 | 0.90 / 0.94 / 0.85 / 0.83 |
+
+What is still over-split (K above my plausible range):
+- **floors** (3-5 slabs in all scenes) and **windows** (4-5 bars each in room_0): both are amodal-completion cases.
+  One floor slab must pass under the rug / furniture (their voxels cost w_other = 0.3 each), one window box must
+  include the unscanned glass (unknown, 0.1). Under its own costs the search is right to prefer pieces.
+- lamps (5-6), baskets, plants, blankets / comforters: genuinely complex or soft shapes; arguably fine.
+- chairs with 4 SQs (seat, back, two arms): arguably plausible, my table says <= 3.
+-> v7: cheaper amodal overlap (w_other 0.1, w_unknown 0.03). Because vIoU depends on these weights, runs with other
+weights are re-scored with the default weights (`code/reeval.py`, `metrics_std.json`; compare.py prefers it).

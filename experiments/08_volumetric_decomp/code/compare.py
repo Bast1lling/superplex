@@ -12,7 +12,8 @@ names = sys.argv[1:] or sorted(p.name for p in RUNS.iterdir() if (p / "metrics.j
 print("| run | " + " | ".join(cols) + " | K plausible | K by size | vIoU by size |")
 print("|---" * (len(cols) + 4) + "|")
 for n in names:
-    m = json.loads((RUNS / n / "metrics.json").read_text())
+    std = RUNS / n / "metrics_std.json"  # re-scored with the default weights (reeval.py), if present
+    m = json.loads((std if std.exists() else RUNS / n / "metrics.json").read_text())
     s = m["summary"]
     pl = plausibility(m["per_instance"])
     f = lambda v: f"{v:.3f}" if isinstance(v, float) else str(v)
