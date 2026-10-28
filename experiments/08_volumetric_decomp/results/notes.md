@@ -112,3 +112,14 @@ it makes over-splitting visible, which vIoU rewards. Shown in `compare.py` outpu
 - room_0: same budget, +0.024 vIoU; renders lose the ring artifacts of ε > 1 shapes and the front wall becomes one
   slab with no tilted pieces. Floor: 2 slabs in this run (1 in v2): the merge via prune-with-refit is not reliable.
 - room_1: more SQs (warm-up makes adds succeed more often), plausibility down (over-splitting), vIoU barely up.
+
+## Decision noise and the merge move (debug subset floor / coffee table / L-wall / sofa)
+- Added an explicit **merge** move (before pruning): per instance, the pair of SQs whose owned voxels are best
+  explained by one box (min vol(box(A ∪ B)) / (vol(box(A)) + vol(box(B)))) is replaced by that box, refitted (warm-up +
+  joint), kept if the IoU fell by < δ (or < min_gain_vox voxels).
+- While testing it, the mean IoU of the *unchanged* configuration fluctuated by ±0.03 from round to round
+  (0.79 / 0.76 / 0.79 / 0.76): Adam at a constant lr keeps jittering the boxes. That is as large as δ, i.e. most
+  accept / reject decisions so far were partly coin flips (explains the noisy proposal outcomes seen earlier).
+- Fix: cosine lr decay to 5% within every round, so each decision compares settled states. On the subset the IoU
+  now rises monotonically over the rounds and ends at 0.83 with 11 SQs (before: ~0.80 with fluctuations).
+- v4 (= v3 + min_gain_vox 15) runs were stopped in favour of v5 = v3 + min_gain_vox 15 + merge + lr decay.

@@ -12,13 +12,15 @@ Structure (greedy, all instances in parallel): start with 1 SQ (PCA box of T_k).
 instance: *add* an SQ on the largest connected component of uncovered target voxels, or *split* the SQ that covers
 the most negatives (2-means of its target voxels). After `steps_round` joint steps the change is kept only if the
 instance's hard volumetric IoU rose by more than `delta`; otherwise the instance is restored. Finally SQs whose
-removal costs less than `prune_delta` IoU are pruned. delta is the price of one primitive in IoU (MDL-style);
+removal costs less than `prune_delta` IoU are pruned (after merge rounds: the most box-like pair of SQs of an instance is
+replaced by one box and refitted; kept under the same rule). delta is the price of one primitive in IoU (MDL-style);
 `min_gain_vox` additionally requires a primitive to explain a minimum absolute volume (IoU gain x |T_k| voxels),
 which stops tiny objects (a few voxels, where one voxel is a large IoU change) from being split.
 """
 
 import argparse
 import json
+import math
 import time
 from pathlib import Path
 
@@ -38,8 +40,8 @@ CFG = dict(
     K=8, margin=0.3, max_neg=200000,
     w_free=1.0, w_other=0.3, w_unknown=0.1, w_region=10.0,
     samples_pos=512, samples_neg=1024, tau=0.02, tau_final=0.01,
-    lr=0.01, steps_init=400, steps_round=250, rounds=8, steps_final=300,
-    delta=0.03, prune_delta=0.03, max_fail=3, prune_rounds=3, min_gain_vox=15.0, min_comp=4,
+    lr=0.01, lr_decay=True, steps_init=400, steps_round=250, rounds=8, steps_final=300,
+    delta=0.03, prune_delta=0.03, max_fail=3, merge_rounds=2, prune_rounds=3, min_gain_vox=15.0, min_comp=4,
     eps_init=0.5, eps_max=1.2, steps_warm=100, seed=0, only="", verbose=False,
 )
 
@@ -218,11 +220,37 @@ def propose(cfg, model, D, ev, i, rng, flip=False):
     return None
 
 
+def merge_proposal(cfg, model, D, ev, i):
+    """Pair of active SQs of instance i whose owned voxels are best explained by one box: minimal
+    vol(box(A u B)) / (vol(box(A)) + vol(box(B))). Returns (j_keep, j_drop, (t, R, a)) or None."""
+    act = np.nonzero(model.active[i].numpy())[0]
+    if len(act) < 2:
+        return None
+    sel = (D["pos_i"] == i).numpy()
+    x = D["pos_x"].numpy()[sel]
+    dp = ev["dp"][torch.from_numpy(sel)]
+    own = dp.argmin(1).numpy()
+    vol = lambda a: float(np.prod(2 * a))
+    fits = {j: box_fit(x[own == j], cfg["res"]) for j in act if (own == j).sum() >= 4}
+    best = None
+    for ii, j in enumerate(act):
+        for k in act[ii + 1:]:
+            if j not in fits or k not in fits:
+                continue
+            u = box_fit(x[(own == j) | (own == k)], cfg["res"])
+            r = vol(u[2]) / (vol(fits[j][2]) + vol(fits[k][2]))
+            if best is None or r < best[0]:
+                best = (r, j, k, u)
+    return None if best is None else (best[1], best[2], best[3])
+
+
 # ---------------------------------------------------------------- main loop
 
 def optimize(cfg, model, D, steps, g, tau, lr, only_slots=None):
     """Adam on all SQs; with only_slots (I, K) bool, the other slots are frozen."""
     opt = torch.optim.Adam(model.parameters(), lr=lr)
+    sched = torch.optim.lr_scheduler.LambdaLR(
+        opt, lambda s: 0.05 + 0.95 * 0.5 * (1 + math.cos(math.pi * s / steps)) if cfg["lr_decay"] else 1.0)
     for s in range(steps):
         loss, _ = loss_fn(cfg, model, D, g, tau)
         opt.zero_grad()
@@ -231,6 +259,7 @@ def optimize(cfg, model, D, steps, g, tau, lr, only_slots=None):
             for p in model.parameters():
                 p.grad[~only_slots] = 0
         opt.step()
+        sched.step()
     return loss.item()
 
 
@@ -313,6 +342,34 @@ def run(cfg, name):
         n_add = sum(1 for i in np.nonzero(accept)[0] if kinds[i] == "add")
         log.append({"round": r, "proposed": int(proposed.sum()), "accepted": int(accept.sum()), "accepted_add": n_add,
                     "gain_median": float(np.median(gain[proposed])), "iou": ev["iou"].mean().item(),
+                    "sqs": int(model.active.sum()), "t": time.time() - t0})
+        print(log[-1])
+    # merge: replace the most box-like pair of an instance by one box, refit, keep if the IoU fell by < prune_delta
+    for r in range(cfg["merge_rounds"]):
+        snap = snapshot_rows(model, torch.arange(I))
+        iou_before = ev["iou"].clone()
+        cand = torch.zeros(I, dtype=torch.bool)
+        new_slots = torch.zeros(I, K, dtype=torch.bool)
+        for i in range(I):
+            p = merge_proposal(cfg, model, D, ev, i)
+            if p is None:
+                continue
+            j, k, (t, R, a) = p
+            model.set_slot(i, j, t, R, a, (cfg["eps_init"], cfg["eps_init"]))
+            model.active[i, k] = False
+            new_slots[i, j] = True
+            cand[i] = True
+        if not cand.any():
+            break
+        optimize(cfg, model, D, cfg["steps_warm"], g, cfg["tau"], cfg["lr"], only_slots=new_slots)
+        optimize(cfg, model, D, cfg["steps_round"], g, cfg["tau"], cfg["lr"])
+        ev = evaluate(model, D)
+        drop = iou_before - ev["iou"]
+        ok = cand & ((drop < cfg["prune_delta"]) | (drop * D["n_pos"] < cfg["min_gain_vox"]))
+        rej = torch.nonzero(cand & ~ok)[:, 0]
+        restore_rows(model, rej, {k: v[rej] for k, v in snap.items()})
+        ev = evaluate(model, D)
+        log.append({"round": f"merge{r}", "tried": int(cand.sum()), "merged": int(ok.sum()), "iou": ev["iou"].mean().item(),
                     "sqs": int(model.active.sum()), "t": time.time() - t0})
         print(log[-1])
     # prune with refit: drop the cheapest SQ of every instance with > 1 SQ, re-optimize, keep the removal if the
