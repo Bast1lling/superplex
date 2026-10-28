@@ -10,7 +10,8 @@ Free voxels outside the room box (oriented box of the structural points) or with
 unknown: free space seen through windows / glass doors is not reliably observed (window frames have no glass).
 Voxels that contain points of an instance always count as that instance's solid (thin objects).
 
-Labels:  -1 free (observed empty space), -2 unknown (deep exterior), >= 0 instance index (0..n_inst-1).
+Labels:  -1 free (observed empty space), -2 unknown (inside the room: occluded / too deep; or the band at the
+room box faces), -3 exterior (outside the room box, not an instance), >= 0 instance index (0..n_inst-1).
 """
 
 from pathlib import Path
@@ -21,7 +22,7 @@ from scipy.spatial import cKDTree
 
 ROOT = Path(__file__).resolve().parents[3]
 DATA = ROOT / "data"
-FREE, UNKNOWN = -1, -2
+FREE, UNKNOWN, EXTERIOR = -1, -2, -3
 
 
 def semantic_components(pos: np.ndarray, lab: np.ndarray, radius: float = 0.05) -> np.ndarray:
@@ -135,6 +136,8 @@ def build_volume(sc: dict, res: float = 0.04, pad: float = 0.2, knn: int = 8,
         q = np.abs((centers - c) @ R)
         outside = (q > half - room_band).any(1).reshape(dims)
         label[outside & (label == FREE)] = UNKNOWN
+        beyond = (q > half + res).any(1).reshape(dims)
+        label[beyond & (label == UNKNOWN)] = EXTERIOR
     # voxels containing points
     vi = np.clip(np.round((pos - lo) / res).astype(int), 0, dims - 1)
     label[vi[:, 0], vi[:, 1], vi[:, 2]] = y  # (last writer wins for shared voxels)

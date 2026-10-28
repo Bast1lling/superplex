@@ -29,7 +29,7 @@ import torch
 from scipy import ndimage
 from sklearn.cluster import KMeans
 
-from volume import FREE, UNKNOWN, build_volume, load_scene, perturb
+from volume import EXTERIOR, FREE, UNKNOWN, build_volume, load_scene, perturb
 from sq import SQSet, sdf_slots, sdf_radial
 
 EXP = Path(__file__).resolve().parents[1]
@@ -38,7 +38,7 @@ RUNS = EXP / "results" / "runs"
 CFG = dict(
     scene="room_0", labels="instance", res=0.04, min_points=20,      # instances with fewer (2 cm) points are dropped
     K=8, margin=0.3, max_neg=200000,
-    w_free=1.0, w_other=0.1, w_unknown=0.03, w_region=10.0,  # metrics: reeval.py uses 0.3 / 0.1
+    w_free=1.0, w_other=0.1, w_unknown=0.03, w_exterior=1.0, w_region=10.0,  # metrics: reeval.py uses 0.3 / 0.1
     samples_pos=512, samples_neg=1024, tau=0.02, tau_final=0.01,
     lr=0.01, lr_decay=True, steps_init=400, steps_round=250, rounds=8, steps_final=300,
     delta=0.03, prune_delta=0.03, max_fail=3, merge_rounds=2, prune_rounds=3, min_gain_vox=15.0, fill_min=0.1, min_comp=4,
@@ -132,9 +132,11 @@ def prepare(cfg, sc, vol):
         region_lo.append((lo + a * res)[None]), region_hi.append((lo + (b - 1) * res)[None])
         own = np.zeros(sub.shape, bool)
         own[tuple((vox - a).T)] = True
-        neg = np.argwhere((sub != k) & ~own & ((sub != UNKNOWN) | (cfg["w_unknown"] > 0))) + a
+        neg = np.argwhere((sub != k) & ~own & ((sub != UNKNOWN) | (cfg["w_unknown"] > 0))
+                          & ((sub != EXTERIOR) | (cfg["w_exterior"] > 0))) + a
         lab = sub[tuple((neg - a).T)]
-        w = np.select([lab == FREE, lab == UNKNOWN], [cfg["w_free"], cfg["w_unknown"]], cfg["w_other"]).astype(np.float32)
+        w = np.select([lab == FREE, lab == UNKNOWN, lab == EXTERIOR],
+                      [cfg["w_free"], cfg["w_unknown"], cfg["w_exterior"]], cfg["w_other"]).astype(np.float32)
         if len(neg) > cfg["max_neg"]:
             sel = rng.choice(len(neg), cfg["max_neg"], replace=False)
             w = w[sel] * len(neg) / cfg["max_neg"]
@@ -349,14 +351,14 @@ def run(cfg, name):
     g = torch.Generator().manual_seed(cfg["seed"])
     rng = np.random.default_rng(cfg["seed"])
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"], labels=cfg["labels"])
-    vol = cached_volume(cfg, sc, "clean")
+    vol = cached_volume(cfg, sc, "clean2")
     D = prepare(cfg, sc, vol)
     D_eval = None
     degraded = any(cfg[k] > 0 for k in ("noise", "normal_deg", "drop", "holes"))
     if degraded:  # fit on the degraded input, report metrics on the clean volume
         D_eval = D
         sp = perturb(sc, cfg["noise"], cfg["normal_deg"], cfg["drop"], cfg["holes"], seed=cfg["seed"])
-        tag = f"n{cfg['noise']}_a{cfg['normal_deg']}_d{cfg['drop']}_h{cfg['holes']}"
+        tag = f"v2_n{cfg['noise']}_a{cfg['normal_deg']}_d{cfg['drop']}_h{cfg['holes']}"
         D = prepare(cfg, sp, cached_volume(cfg, sp, tag))
     I, K = D["I"], cfg["K"]
     print(f"{I} instances, {len(D['pos_x'])} target voxels, {len(D['neg_x'])} negatives, prep {time.time() - t0:.0f} s")

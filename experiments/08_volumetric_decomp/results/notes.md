@@ -219,3 +219,17 @@ under a sofa that stands at the wall, and open window frames.) On room_0 it adds
   were re-rendered (`code/rerender.py`).
 - **v8 is now the default** (`fit.py` CFG: w_other 0.1, w_unknown 0.03, fill_planar on). Strict metric weights are
   fixed in `reeval.py` (METRIC) and used by `eval_external.py`; `fit_exist.py` keeps the weights of its runs.
+
+| run (strict weights) | sqs | K/inst | vIoU | precision | recall | coverage | point mIoU | plausible | K by size | vIoU by size |
+|---|---|---|---|---|---|---|---|---|---|---|
+| office0_v6 | 67 | 1.68 | 0.870 | 0.929 | 0.925 | 0.958 | 0.576 | 0.82 | 1.0 / 1.5 / 2.4 / 1.9 | 0.90 / 0.94 / 0.85 / 0.83 |
+| office0_v8_planar | 61 | 1.53 | 0.812 | 0.850 | 0.944 | 0.950 | 0.470 | 0.88 | 1.0 / 1.0 / 2.1 / 1.8 | 0.87 / 0.82 / 0.79 / 0.76 |
+- office_0 v8: inside the room clean (sofa 2, desk, chairs, bins 1 each), but the rug / floor slab and the front
+  wall bulge *outside* the room by up to the 30 cm region margin: with w_unknown = 0.03 the space outside the room
+  became nearly free to cover.
+
+## v9: exterior label
+Unknown voxels strictly outside the room box (oriented box of the wall / floor / ceiling points, + 1 voxel) are now
+their own label EXTERIOR with full weight (w_exterior = 1); unknown *inside* the room (occluded, deep inside
+objects, the band at the room faces where window glass sits) stays cheap. The strict metric keeps weight 0.1 for
+both (identical to before, so old runs re-score the same).

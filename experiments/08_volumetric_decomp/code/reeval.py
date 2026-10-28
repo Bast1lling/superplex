@@ -16,7 +16,7 @@ from sq import SQSet, matrix_to_quat
 from volume import load_scene
 
 
-METRIC = dict(w_free=1.0, w_other=0.3, w_unknown=0.1, fill_planar=False)  # strict metric weights
+METRIC = dict(w_free=1.0, w_other=0.3, w_unknown=0.1, w_exterior=0.1, fill_planar=False)  # strict metric weights
 
 
 def reeval(name):
@@ -24,7 +24,7 @@ def reeval(name):
     rcfg = json.loads((run / "config.json").read_text())
     cfg = dict(CFG) | {k: rcfg[k] for k in ("scene", "labels", "res", "min_points") if k in rcfg} | METRIC
     sc = load_scene(cfg["scene"], min_points=cfg["min_points"], labels=cfg["labels"])
-    vol = cached_volume(cfg, sc, "clean")
+    vol = cached_volume(cfg, sc, "clean2")
     D = prepare(cfg, sc, vol)
     s = dict(np.load(run / "sqs.npz"))
     I = D["I"]
