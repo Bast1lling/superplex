@@ -1,7 +1,7 @@
 """Decomposition metrics and renders.
 
 Per instance (GT): K (number of SQs), volumetric IoU / precision / recall of the SQ union against the instance's
-solid voxels (negatives = free space + other instances, unknown ignored), surface coverage (share of the instance's
+solid voxels (negatives weighted by label as in the fit; reeval.py re-scores with the fixed strict weights), coverage (share of the instance's
 points within `cov_tol` of / inside its union). Scene: point -> instance assignment by the most-inside union (mIoU),
 as in experiments 05-07. Size bins in 2 cm points.
 """

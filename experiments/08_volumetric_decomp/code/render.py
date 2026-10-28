@@ -1,6 +1,6 @@
 """Minimal software renderer (orthographic point splatting with a z-buffer) for point clouds and SQ sets.
 
-Used to inspect decompositions visually (PNG), no OpenGL needed.
+Used to inspect decompositions visually (JPG), no OpenGL needed.
 """
 
 import numpy as np
@@ -47,9 +47,6 @@ def splat(points, colors, normals, R, bounds, width=900, radius=1):
     img = np.ones((height, width, 3))
     depth = np.full((height, width), -np.inf)
     order = np.argsort(v[:, 2])  # far to near, later writes win
-    for dx in range(-radius + 1, radius):
-        for dy in range(-radius + 1, radius):
-            pass
     offs = [(dx, dy) for dx in range(-radius + 1, radius) for dy in range(-radius + 1, radius)] or [(0, 0)]
     for dx, dy in offs:
         x, y = px[order] + dx, py[order] + dy
