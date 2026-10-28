@@ -1,0 +1,21 @@
+{
+ "scene": "office_0",
+ "method": "both",
+ "q": 0.8,
+ "min_vox": 8,
+ "max_depth": 10,
+ "cell": 0.2,
+ "cx": 0.05,
+ "tol": 0.5,
+ "lam": 30.0,
+ "steps": 300,
+ "refine_steps": 400,
+ "prune": 0.01,
+ "planar": true,
+ "eps_max": 1.2,
+ "seed": 0,
+ "w_sib": 1.0,
+ "res": 0.04,
+ "min_points": 20,
+ "labels": "instance"
+}

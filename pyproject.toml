@@ -3,12 +3,16 @@ name = "superplex"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "coacd>=1.0.14",
     "fastapi>=0.142.2",
+    "matplotlib>=3.11.2",
     "pyyaml>=6.0.3",
     "scikit-image>=0.26.0",
+    "scikit-learn>=1.9.1",
     "torch>=2.14.1",
     "torchvision>=0.29.1",
     "trackio>=0.42.0",
+    "trimesh>=5.2.0",
     "uvicorn>=0.54.0",
 ]
 

@@ -79,13 +79,14 @@ Standard CD / SDF error rewards patchwork, so the main numbers are *per-instance
 Size bins are in 2 cm points: < 250 / 250–1250 / 1250–5000 / > 5000 (≈ 1k / 5k / 20k at 1 cm as in 06).
 
 ## Files
-- `code/volume.py` scene loading (instance or semantic labels, scan-like degradation), labeled voxel volume.
+- `code/volume.py` scene loading (instance or semantic labels, scan-like degradation), labeled voxel volume, planar fill, volume cache.
 - `code/fit.py` greedy volumetric fitter (main method; defaults = best config). `code/fit_exist.py` fixed slots +
   existence + parsimony variant. `code/sq.py` SQ parameters / SDF.
 - `code/evaluate.py` metrics + renders, `code/plausible.py` plausible-K table, `code/compare.py` run table,
   `code/reeval.py` re-score runs with the strict metric weights, `code/eval_external.py` score experiment 06's
-  snapshots, `code/rerender.py`, `code/export_viewer.py` + `viewer/server.py` (06's viewer on these runs; untested
-  here because it needs the user's data paths / trackio).
+  snapshots, `code/rerender.py`, `code/export_viewer.py` + `viewer/server.py` (06's viewer on these runs plus a voxel layer showing
+  the labeled volume / planar-fill targets, runs sorted by scene + version, port 8008; run from the repo root:
+  `uv run python experiments/08_volumetric_decomp/viewer/server.py`).
 - `results/runs/<run>/`: config.json, metrics.json (+ metrics_std.json = strict re-score), sqs.npz (final SQs:
   trans, rot (local-to-world columns), scale, eps, instance index; instance_ids), render.jpg.
 - `results/notes.md`: chronological log of all runs and observations.

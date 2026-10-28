@@ -157,3 +157,50 @@ def yaw_box(p: np.ndarray):
 
 def voxel_centers(vol: dict, mask: np.ndarray) -> np.ndarray:
     return (vol["lo"] + np.argwhere(mask) * vol["res"]).astype(np.float32)
+
+
+def cached_volume(cfg, sc, tag):
+    cache = Path("/tmp/claude-0/volcache") / f"{cfg['scene']}_{cfg['res']}_{cfg['min_points']}_{cfg['labels']}_{tag}.npz"
+    if cache.exists():
+        vol = dict(np.load(cache))
+        vol["res"] = float(vol["res"])
+        return vol
+    vol = build_volume(sc, res=cfg["res"])
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(cache, **vol)
+    return vol
+
+
+def fill_planar(vox, res, thick, min_size):
+    """Amodal completion of thin planar instances (floor, walls, windows, rugs, pictures): if the PCA box of the
+    voxels is thinner than `thick` and larger than `min_size`, the 2D holes of its projection onto its plane (floor
+    under furniture, unscanned window glass, wall behind a picture) are filled; the new cells get the instance's
+    5-95% thickness range. Holes = cells inside the 2D convex hull of the projection (plain hole filling misses holes
+that touch the border, e.g. floor under a sofa standing at the wall, or open window frames). Returns the extra voxel indices (may overlap other instances: amodal targets)."""
+    if len(vox) < 20:
+        return np.zeros((0, 3), int)
+    x = vox.astype(float)
+    mu = x.mean(0)
+    _, vec = np.linalg.eigh((x - mu).T @ (x - mu))
+    q = (x - mu) @ vec  # columns ascending: q[:, 0] is the thin axis
+    ext = (q.max(0) - q.min(0)) * res
+    if ext[0] > thick or ext[2] < min_size:
+        return np.zeros((0, 3), int)
+    uv = np.round(q[:, 1:] - q[:, 1:].min(0)).astype(int)
+    grid = np.zeros(uv.max(0) + 1, bool)
+    grid[uv[:, 0], uv[:, 1]] = True
+    from scipy.spatial import Delaunay
+    try:
+        hull = Delaunay(np.unique(uv, axis=0))
+    except Exception:  # degenerate (collinear) projection
+        return np.zeros((0, 3), int)
+    allc = np.argwhere(np.ones_like(grid))
+    filled = (hull.find_simplex(allc) >= 0).reshape(grid.shape) & ~grid
+    cells = np.argwhere(filled)
+    if len(cells) == 0:
+        return np.zeros((0, 3), int)
+    w = np.arange(np.floor(np.quantile(q[:, 0], 0.05)), np.ceil(np.quantile(q[:, 0], 0.95)) + 1)
+    c = cells + q[:, 1:].min(0)
+    pts = np.concatenate([np.column_stack([np.full(len(c), wi), c]) for wi in w])
+    new = np.round(pts @ vec.T + mu).astype(int)
+    return np.unique(new, axis=0)

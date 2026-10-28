@@ -1,0 +1,100 @@
+data:
+  drop_unlabeled: true
+  points_dir: /home/sebastian/Documents/Uni/Thesis/data/replica_v1_points
+  scene: office_0
+  tokens_dir: /home/sebastian/Documents/Uni/Thesis/data/replica_v1_sonata/stage4
+  version: 0
+existence:
+  enabled: false
+  fallback: 0.5
+  init: 0.9
+exp08:
+  cell: 0.2
+  eps_max: 1.2
+  fill_planar: true
+  labels: instance
+  max_depth: 10
+  method: both
+  min_points: 20
+  min_vox: 8
+  planar: true
+  planar_min: 0.5
+  planar_thick: 0.2
+  prune: 0.01
+  q: 0.8
+  refine_steps: 400
+  res: 0.04
+  scene: office_0
+  seed: 0
+  steps: 300
+  tol: 0.5
+  w_sib: 0.1
+init:
+  eps:
+  - 1.0
+  - 1.0
+  kmeans_iters: 25
+  kmeans_max_points: 20000
+  margin: 0.0
+  quantile: 0.98
+logging:
+  eval_every: 250
+  snapshot_every: 100
+loss:
+  backward:
+    delta: 0.0
+    grid_pad: 0.2
+    grid_res: 0.01
+    samples_per_sq: 64
+    union_sharpness: 0.01
+    weight: 1.0
+  forward:
+    mode: union_abs
+    softmin: 0.0
+    weight: 1.0
+  parsimony:
+    weight: 0.0
+  sdf: radial
+metrics:
+  active_existence: 0.5
+  air_delta: 0.05
+  size_bins:
+  - 1000
+  - 5000
+  - 20000
+  tolerance: 0.01
+optim:
+  lr:
+    eps: 0.02
+    existence: 0.05
+    log_scale: 0.01
+    rotation: 0.01
+    translation: 0.01
+  optimizer: adam
+  schedule: cosine
+  steps: 2000
+parametrization:
+  eps:
+    max: 1.9
+    min: 0.1
+    type: sigmoid
+  rotation: quaternion
+  scale:
+    max: 5.0
+    min: 0.005
+    type: exp
+sampling:
+  points_per_step: 32768
+  scheme: instance_balanced
+seed: 0
+split:
+  enabled: false
+  every: 200
+  kmeans_iters: 15
+  min_gain: 0.005
+  min_points: 20
+  retry_cooldown: 2
+  start: 200
+  stop: 1800
+  verify: false
+sqs_per_instance: 6
