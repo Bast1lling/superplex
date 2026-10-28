@@ -255,3 +255,29 @@ both (identical to before, so old runs re-score the same).
 - Same structure (same SQ count, plausibility), 2.4x the voxels and ~1.7x the runtime -> no reason to go finer for
   this coarse goal. Scoring the 3 cm SQs on the 4 cm grid gives 0.698 (recall 0.83): SQs fitted to 3 cm-thin
   objects miss the shifted 4 cm voxel centers, i.e. voxel IoU across grids is unreliable for thin objects.
+
+## Seed stability (room_0, v9, seeds 0 / 1 / 2)
+| seed | sqs | vIoU (strict) | plausible | K by size |
+|---|---|---|---|---|
+| 0 | 116 | 0.784 | 0.88 | 1.0 / 1.3 / 2.0 / 1.8 |
+| 1 | 116 | 0.784 | 0.90 | 1.0 / 1.2 / 2.0 / 1.8 |
+| 2 | 114 | 0.783 | 0.90 | 1.0 / 1.2 / 1.9 / 1.8 |
+- Per-instance SQ counts are identical for ~90% of the instances; differences are in complex objects (lamp 5-7,
+  plant, basket). The floor is 2 slabs in all three v9 seeds (1 in v8): room_0's floor has an alcove, so a single
+  slab now has to cover exterior space, which v9 penalizes. Since the lr-decay fix the search is deterministic
+  enough that single runs are representative.
+
+## Where this leaves the project / suggested next steps
+1. **Pseudo-ground-truth for the feed-forward model.** The v9 decompositions (≈1.5 SQs per instance, interpretable,
+   stable across seeds) can supervise a DETR-style model directly (Hungarian matching on SQ parameters per instance),
+   or the volumetric loss itself can be the training loss (it only needs oriented points + labels; existence +
+   parsimony worked with it, see fit_exist runs) with the greedy search results as a distillation target for the
+   number / placement of primitives — the part existence alone cannot learn (merging).
+2. **ScanNet.** Meshes have vertex normals, so volume.py applies directly (structural classes: wall / floor /
+   ceiling exist in ScanNet's label set too). The degradation test suggests the structure survives scan artifacts.
+   Data access (ScanNet terms of use) was not possible from this session.
+3. **GPU.** Everything here ran on 4 CPU cores (~20 min / room). The fitter is fully batched over instances; on a GPU
+   a room should take ~1 min, which makes per-scene sweeps over δ (the single parsimony knob) cheap.
+4. Open issues: windows / doors only become single boxes thanks to the planar completion heuristic (convex hull in
+   the instance plane); hollow non-planar objects (baskets, lamp shades) still get 3-6 SQs; floors of non-convex
+   rooms are 2 slabs.
