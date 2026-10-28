@@ -40,10 +40,14 @@ patchwork (07: 14–72 SQs per wall). Humans decompose *volumes*. So here:
    surfaces of its k nearest points (normals point to free space, verified on Replica), else free. Solid voxels get the
    instance of the nearest point. Space behind walls / floor / ceiling (structural classes) is kept only 10 cm deep,
    every instance's solid is clipped to its gravity-aligned oriented box (+1 voxel, fixes space behind windows /
-   blinds), anything deeper than 1 m is *unknown*. Voxels containing points always belong to their instance (thin
-   objects). Labels: free / unknown / instance.
-2. **Per-instance occupancy loss** (`code/fit.py`). For instance k: positives = its solid voxels, negatives = free
-   voxels (w_free), other instances' voxels (w_other) and unknown voxels (w_unknown) inside its box + 30 cm margin.
+   blinds), anything deeper than 1 m is *unknown*. Free space beyond / at the faces of the room box (oriented box of
+   the wall / floor / ceiling points) is unknown (seen through windows), and unknown space outside the room box is
+   *exterior*. Voxels containing points always belong to their instance (thin objects).
+   Labels: free / unknown / exterior / instance.
+2. **Per-instance occupancy loss** (`code/fit.py`). For instance k: positives = its solid voxels (thin planar
+   instances — floor, walls, windows, rugs — additionally get the convex hull of their 2D projection in their own
+   plane: floor under furniture, window glass), negatives = everything else inside its box + 30 cm margin, weighted
+   free 1, other instance 0.1, unknown 0.03, exterior 1 (cheap overlap = amodal completion).
    Union SDF d = min_j d_j (radial SDF), loss = logistic: softplus(d/τ) on positives, w·softplus(−d/τ) on negatives,
    normalized by |T_k| (every instance counts equally). The logistic is linear far from the boundary, so distant
    targets / deep intrusions always produce gradients. A penalty keeps each SQ's extent inside the region where
@@ -62,9 +66,11 @@ patchwork (07: 14–72 SQs per wall). Humans decompose *volumes*. So here:
 ## Evaluation (`code/evaluate.py`)
 Standard CD / SDF error rewards patchwork, so the main numbers are *per-instance* and judged at a given SQ budget:
 - **K**: SQs per instance (parsimony), reported by instance size.
-- **vIoU**: volumetric IoU of the instance's SQ union with its solid voxels (free + other instances count as
-  false positives, unknown ignored). **precision** = 1 − leakage (share of the union volume that is the instance),
-  **recall**.
+- **vIoU**: volumetric IoU of the instance's SQ union with its solid voxels; false positives weighted free 1, other
+  instance 0.3, unknown / exterior 0.1, no planar completion (strict weights, `reeval.py` METRIC; runs fitted with
+  other weights are re-scored into `metrics_std.json`). **precision** = 1 − leakage, **recall**. Note: this strict
+  vIoU penalizes amodal completion (window box over unscanned glass, floor under the rug).
+- **plausible**: share of instances whose SQ count lies in a hand-written per-class range (`plausible.py`).
 - **coverage**: share of the instance's points inside or within 3 cm of its union.
 - **point mIoU / acc**: points assigned to the instance whose union is most inside (as in 05–07).
 - **Renders** (`render.jpg` per run): GT instances, SQs colored by instance, SQs colored per primitive, from an
