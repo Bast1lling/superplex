@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# per-experiment results over 1 MB (trackio dbs, big snapshots): kept locally, not versioned
+experiments/*/results/large_files/
