@@ -1,0 +1,16 @@
+{
+ "scene": "room_0",
+ "frames": "stride20",
+ "steps": 500,
+ "rays": 4096,
+ "samples": 128,
+ "t_near": 0.1,
+ "t_far": 8.0,
+ "tau0": 0.2,
+ "tau1": 0.01,
+ "lr": 0.01,
+ "w_depth": 0.0,
+ "min_px": 20,
+ "res": 0.04,
+ "method": "render"
+}

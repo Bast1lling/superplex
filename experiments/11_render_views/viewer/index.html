@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rendering Views Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #15171c; --panel: rgba(30, 33, 40, 0.92); --fg: #e4e6eb; --muted: #9aa0ab; --accent: #6aa8ff; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  #panel { position: absolute; top: 12px; left: 12px; width: 250px; padding: 12px 14px; background: var(--panel); border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.4); }
+  #panel h1 { font-size: 14px; margin: 0 0 10px; }
+  label { display: block; margin: 8px 0 3px; color: var(--muted); }
+  select, input[type=range] { width: 100%; box-sizing: border-box; }
+  select { background: #262a33; color: var(--fg); border: 1px solid #3a3f4b; border-radius: 4px; padding: 4px 6px; font: inherit; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row span { min-width: 52px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #stats, #pick { margin-top: 10px; color: var(--muted); white-space: pre-line; font-variant-numeric: tabular-nums; }
+  #pick:empty { display: none; }
+  #view { position: absolute; right: 12px; bottom: 12px; width: min(48vw, 720px); display: none; background: var(--panel);
+          border-radius: 8px; padding: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.4); }
+  #view .frame { position: relative; }
+  #view img, #view canvas { width: 100%; display: block; border-radius: 4px; }
+  #view canvas { position: absolute; inset: 0; opacity: 0.65; }
+  #view div { color: var(--muted); margin-top: 6px; }
+  #hint { margin-top: 10px; color: var(--muted); font-size: 12px; }
+  #loading { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 16px; color: var(--muted); pointer-events: none; }
+</style>
+<script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Scene + rendering views</h1>
+  <label for="scene">Scene</label>
+  <select id="scene"></select>
+  <label for="mode">Color by</label>
+  <select id="mode">
+    <option value="rgb">RGB</option>
+    <option value="normal">Normal</option>
+    <option value="height">Height</option>
+    <option value="class">Semantic class</option>
+    <option value="instance">Instance</option>
+    <option value="segment">Segment (pre-segmentation)</option>
+  </select>
+  <label>Z range (m)</label>
+  <div class="row"><input id="zmin" type="range" step="0.01"><span id="zminVal"></span></div>
+  <div class="row"><input id="zmax" type="range" step="0.01"><span id="zmaxVal"></span></div>
+  <label for="size">Point size (× voxel)</label>
+  <div class="row"><input id="size" type="range" min="0.3" max="4" step="0.1" value="1.5"><span id="sizeVal">1.5</span></div>
+  <label><input type="checkbox" id="showViews" checked> rendering views</label>
+  <label for="stride">every n-th view</label>
+  <div class="row"><input id="stride" type="range" min="1" max="100" step="1" value="20"><span id="strideVal">20</span></div>
+  <label><input type="checkbox" id="showLabels"> labelled renderings (key L)</label>
+  <div id="hint">click a view: its rendering + only the points it sees · Esc: back</div>
+  <div id="stats"></div>
+  <div id="pick"></div>
+</div>
+<div id="loading">loading…</div>
+<div id="view"><div class="frame"><img id="viewImg" alt="rendering"><canvas id="viewLabels"></canvas></div><div id="viewCaption"></div></div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const TOP_CUT = 0.3; // default: cut this much (m) off the top so rooms can be looked into
+
+const $ = (id) => document.getElementById(id);
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // colors are already sRGB bytes: pass them through
+renderer.localClippingEnabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15171c);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 1000);
+camera.up.set(0, 0, 1); // Replica is z-up
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.zoomToCursor = true;
+controls.screenSpacePanning = true;
+
+const clipLow = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);   // keeps z >= zmin
+const clipHigh = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0); // keeps z <= zmax
+const material = new THREE.PointsMaterial({ vertexColors: true, sizeAttenuation: true, clippingPlanes: [clipLow, clipHigh] });
+let voxel = 0.01, points = null, bounds = null, data = null, sem = null, loadToken = 0;
+
+// ---------- color modes ----------
+const palette = (() => { // distinct colors for ids, id 0 = unlabeled (grey)
+  const lut = new Uint8Array(65536 * 3), c = new THREE.Color();
+  for (let i = 1; i < 65536; i++) {
+    c.setHSL((i * 0.618034) % 1, 0.55 + 0.35 * ((i * 0.754877) % 1), 0.42 + 0.2 * ((i * 0.569840) % 1));
+    lut[3 * i] = c.r * 255; lut[3 * i + 1] = c.g * 255; lut[3 * i + 2] = c.b * 255;
+  }
+  lut.fill(110, 0, 3);
+  return lut;
+})();
+
+function turbo(t) {
+  const r = 0.13572138 + t * (4.61539260 + t * (-42.66032258 + t * (132.13108234 + t * (-152.94239396 + t * 59.28637943))));
+  const g = 0.09140261 + t * (2.19418839 + t * (4.84296658 + t * (-14.18503333 + t * (4.27729857 + t * 2.82956604))));
+  const b = 0.10667330 + t * (12.64194608 + t * (-60.58204836 + t * (110.36276771 + t * (-89.90310912 + t * 27.34824973))));
+  return [r, g, b].map((x) => Math.round(255 * Math.min(1, Math.max(0, x))));
+}
+const turboLut = (() => { const l = new Uint8Array(256 * 3); for (let i = 0; i < 256; i++) l.set(turbo(i / 255), 3 * i); return l; })();
+
+const colorCache = {};
+function colors(mode) {
+  if (colorCache[mode]) return colorCache[mode];
+  const n = data.n;
+  let out;
+  if (mode === "rgb") out = data.rgb;
+  else if (mode === "normal") out = data.nrm;
+  else {
+    out = new Uint8Array(n * 3);
+    if (mode === "height") {
+      for (let i = 0; i < n; i++) out.set(turboLut.subarray(3 * (data.pos[3 * i + 2] >> 8), 3 * (data.pos[3 * i + 2] >> 8) + 3), 3 * i);
+    } else {
+      const ids = mode === "segment" ? data.seg : data.inst;
+      const map = mode === "class" ? sem.id_to_label : null;
+      for (let i = 0; i < n; i++) {
+        const id = map ? (map[ids[i]] ?? 0) : ids[i];
+        const j = 3 * id;
+        out[3 * i] = palette[j]; out[3 * i + 1] = palette[j + 1]; out[3 * i + 2] = palette[j + 2];
+      }
+    }
+  }
+  return (colorCache[mode] = out);
+}
+
+function applyColors() {
+  if (!points) return;
+  points.geometry.setAttribute("color", new THREE.BufferAttribute(colors($("mode").value), 3, true));
+}
+
+// ---------- z range ----------
+function zLimits() {
+  return [bounds.min.z, bounds.max.z];
+}
+function applyZ(changed) {
+  let lo = parseFloat($("zmin").value), hi = parseFloat($("zmax").value);
+  if (lo > hi) { if (changed === "zmin") $("zmax").value = hi = lo; else $("zmin").value = lo = hi; }
+  clipLow.constant = -lo;
+  clipHigh.constant = hi;
+  $("zminVal").textContent = lo.toFixed(2);
+  $("zmaxVal").textContent = hi.toFixed(2);
+}
+function resetZ() {
+  const [lo, hi] = zLimits();
+  for (const id of ["zmin", "zmax"]) { $(id).min = lo.toFixed(2); $(id).max = hi.toFixed(2); }
+  $("zmin").value = lo.toFixed(2);
+  $("zmax").value = (hi - TOP_CUT).toFixed(2);
+  applyZ();
+}
+
+// ---------- loading ----------
+function setPointSize() {
+  const k = parseFloat($("size").value);
+  $("sizeVal").textContent = k.toFixed(1);
+  material.size = voxel * k;
+}
+
+function fitCamera() {
+  const center = bounds.getCenter(new THREE.Vector3());
+  const r = bounds.getSize(new THREE.Vector3()).length() / 2;
+  controls.target.copy(center);
+  camera.position.copy(center).add(new THREE.Vector3(0.6, -1.0, 0.9).normalize().multiplyScalar(r * 1.6));
+  controls.update();
+}
+
+async function load() {
+  const token = ++loadToken;
+  const name = $("scene").value;
+  $("loading").style.display = "flex";
+  $("pick").textContent = "";
+  const t0 = performance.now();
+  const q = `scene=${encodeURIComponent(name)}`;
+  const [res, semRes] = await Promise.all([fetch(`/api/points?${q}`), fetch(`/api/semantics?${q}`)]);
+  const buf = await res.arrayBuffer();
+  const semantics = await semRes.json();
+  if (token !== loadToken) return; // a newer request superseded this one
+
+  const n = parseInt(res.headers.get("X-Count"));
+  const lo = res.headers.get("X-Min").split(",").map(Number);
+  const ext = res.headers.get("X-Extent").split(",").map(Number);
+  data = {
+    n,
+    pos: new Uint16Array(buf, 0, 3 * n),
+    inst: new Uint16Array(buf, 6 * n, n),
+    seg: new Uint16Array(buf, 8 * n, n),
+    rgb: new Uint8Array(buf, 10 * n, 3 * n),
+    nrm: new Uint8Array(buf, 13 * n, 3 * n),
+  };
+  data.hasSegments = data.seg.some((s) => s !== 0);
+  sem = semantics;
+  for (const k in colorCache) delete colorCache[k];
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.BufferAttribute(data.pos, 3, true));
+  if (points) { scene.remove(points); points.geometry.dispose(); }
+  points = new THREE.Points(geom, material);
+  points.position.set(...lo); // normalized uint16 positions in [0, 1] -> world via scale + offset
+  points.scale.set(...ext);
+  points.frustumCulled = false;
+  scene.add(points);
+  bounds = new THREE.Box3(new THREE.Vector3(...lo), new THREE.Vector3(lo[0] + ext[0], lo[1] + ext[1], lo[2] + ext[2]));
+  applyColors();
+  setPointSize();
+  resetZ();
+  fitCamera();
+  $("loading").style.display = "none";
+  loadViews(name);
+  $("stats").textContent =
+    `${n.toLocaleString()} points · ${(buf.byteLength / 1e6).toFixed(0)} MB · ${((performance.now() - t0) / 1000).toFixed(2)} s\n` +
+    `extent ${ext.map((x) => x.toFixed(1)).join(" × ")} m` +
+    (data.hasSegments ? "" : "\nno pre-segmentation for this scene");
+}
+
+// double-click: orbit around the clicked point and show its labels
+const raycaster = new THREE.Raycaster();
+renderer.domElement.addEventListener("dblclick", (e) => {
+  if (!points || pickView(e) !== null) return;
+  const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  raycaster.params.Points.threshold = voxel * 2;
+  const zlo = parseFloat($("zmin").value), zhi = parseFloat($("zmax").value);
+  const hit = raycaster.intersectObject(points).find((h) => h.point.z >= zlo && h.point.z <= zhi);
+  if (!hit) return;
+  controls.target.copy(hit.point);
+  controls.update();
+  const inst = data.inst[hit.index], cls = sem.id_to_label[inst] ?? 0;
+  $("pick").textContent =
+    `picked: ${sem.classes[cls] ?? "unlabeled"}\n` +
+    `instance ${inst} · segment ${data.seg[hit.index]} · z ${hit.point.z.toFixed(2)} m`;
+});
+
+// ---------- rendering views ----------
+// blobs at the camera centers of the NICE-SLAM renderings (+ a short line in viewing direction)
+const viewsGroup = new THREE.Group();
+scene.add(viewsGroup);
+let views = null, shown = [], blobs = null, selected = null, filtered = false;
+
+async function loadViews(name) {
+  views = await (await fetch(`/api/views?scene=${encodeURIComponent(name)}`)).json();
+  closeView();
+  buildBlobs();
+}
+
+function buildBlobs() {
+  for (const c of [...viewsGroup.children]) { viewsGroup.remove(c); c.geometry.dispose(); }
+  blobs = null;
+  if (!views || !views.c2w.length) { $("strideVal").textContent = "none"; return; }
+  const stride = parseInt($("stride").value);
+  $("strideVal").textContent = stride;
+  shown = [];
+  for (let f = 0; f < views.c2w.length; f += stride) shown.push(f);
+  blobs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshBasicMaterial(), shown.length);
+  const m = new THREE.Matrix4(), line = [];
+  shown.forEach((f, i) => {
+    const T = views.c2w[f];  // row-major 4x4, column 2 = viewing direction (OpenCV z forward)
+    m.makeTranslation(T[3], T[7], T[11]);
+    blobs.setMatrixAt(i, m);
+    blobs.setColorAt(i, new THREE.Color(f === selected ? 0xffcc33 : 0x6aa8ff));
+    line.push(T[3], T[7], T[11], T[3] + 0.3 * T[2], T[7] + 0.3 * T[6], T[11] + 0.3 * T[10]);
+  });
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute("position", new THREE.Float32BufferAttribute(line, 3));
+  viewsGroup.add(blobs, new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x6aa8ff })));
+  viewsGroup.visible = $("showViews").checked;
+}
+
+function pickView(e) {
+  if (!blobs || !viewsGroup.visible) return null;
+  raycaster.setFromCamera(new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), camera);
+  const hit = raycaster.intersectObject(blobs)[0];
+  return hit ? shown[hit.instanceId] : null;
+}
+
+function select(f) { selected = f; buildBlobs(); }
+
+// GT instance per pixel (server: back-projected depth -> nearest labelled point), colored like the points
+let labelFrame = null;
+async function drawLabels() {
+  const f = selected, on = $("showLabels").checked;
+  $("viewLabels").style.display = on ? "block" : "none";
+  if (!on || f === null || labelFrame === f) return;
+  const res = await fetch(`/api/view_labels?scene=${encodeURIComponent($("scene").value)}&frame=${f}`);
+  const w = parseInt(res.headers.get("X-Width")), h = parseInt(res.headers.get("X-Height"));
+  const ids = new Uint16Array(await res.arrayBuffer());
+  if (f !== selected) return;
+  const cv = $("viewLabels"), img = new ImageData(w, h), toClass = $("mode").value === "class";
+  cv.width = w; cv.height = h;
+  for (let i = 0; i < ids.length; i++) {
+    const id = toClass ? (sem.id_to_label[ids[i]] ?? 0) : ids[i], j = 3 * id;
+    img.data[4 * i] = palette[j]; img.data[4 * i + 1] = palette[j + 1]; img.data[4 * i + 2] = palette[j + 2];
+    img.data[4 * i + 3] = ids[i] ? 255 : 0;
+  }
+  cv.getContext("2d").putImageData(img, 0, 0);
+  labelFrame = f;
+}
+
+async function showView(f) {
+  select(f);
+  $("viewImg").src = `/api/view_image?scene=${encodeURIComponent($("scene").value)}&frame=${f}`;
+  $("viewCaption").textContent = `frame ${f}`;
+  $("view").style.display = "block";
+  drawLabels();
+  const res = await fetch(`/api/view_points?scene=${encodeURIComponent($("scene").value)}&frame=${f}`);
+  points.geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(await res.arrayBuffer()), 1));
+  filtered = true;
+  $("pick").textContent = `frame ${f}: ${parseInt(res.headers.get("X-Count")).toLocaleString()} visible points (Esc: all)`;
+}
+
+function closeView() {
+  $("view").style.display = "none";
+  labelFrame = null;
+  if (filtered && points) { points.geometry.setIndex(null); filtered = false; $("pick").textContent = ""; }
+  if (selected !== null) select(null);
+}
+
+// click (not a drag) on a view: its rendering + only the points it sees
+let down = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener("click", (e) => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  const f = pickView(e);
+  if (f !== null) showView(f);
+});
+addEventListener("keydown", (e) => {
+  if (e.code === "Escape") closeView();
+  if (e.code === "KeyL" && e.target.tagName !== "SELECT") { $("showLabels").checked = !$("showLabels").checked; drawLabels(); }
+});
+$("showLabels").addEventListener("change", drawLabels);
+$("mode").addEventListener("change", () => { labelFrame = null; drawLabels(); });
+$("showViews").addEventListener("change", () => { viewsGroup.visible = $("showViews").checked; });
+$("stride").addEventListener("input", buildBlobs);
+
+// WASD/QE fly movement: moves camera and orbit target together
+const keys = new Set();
+addEventListener("keydown", (e) => { if (e.target.tagName !== "SELECT") keys.add(e.code); });
+addEventListener("keyup", (e) => keys.delete(e.code));
+addEventListener("blur", () => keys.clear());
+const clock = new THREE.Clock();
+function fly(dt) {
+  if (!keys.size || !bounds) return;
+  const speed = bounds.getSize(new THREE.Vector3()).length() * 0.15 * (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 4 : 1) * dt;
+  const fwd = camera.getWorldDirection(new THREE.Vector3());
+  const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize();
+  const move = new THREE.Vector3();
+  if (keys.has("KeyW")) move.add(fwd);
+  if (keys.has("KeyS")) move.sub(fwd);
+  if (keys.has("KeyD")) move.add(right);
+  if (keys.has("KeyA")) move.sub(right);
+  if (keys.has("KeyE")) move.add(camera.up);
+  if (keys.has("KeyQ")) move.sub(camera.up);
+  if (move.lengthSq() === 0) return;
+  move.normalize().multiplyScalar(speed);
+  camera.position.add(move);
+  controls.target.add(move);
+}
+
+renderer.setAnimationLoop(() => {
+  fly(clock.getDelta());
+  controls.update();
+  renderer.render(scene, camera);
+});
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+$("size").addEventListener("input", setPointSize);
+$("zmin").addEventListener("input", () => applyZ("zmin"));
+$("zmax").addEventListener("input", () => applyZ("zmax"));
+$("mode").addEventListener("change", applyColors);
+$("scene").addEventListener("change", load);
+
+const meta = await (await fetch("/api/scenes")).json();
+voxel = meta.voxel;
+for (const s of meta.scenes) $("scene").add(new Option(s, s));
+$("scene").value = meta.scenes.includes("room_0") ? "room_0" : meta.scenes[0];
+load();
+</script>
+</body>
+</html>

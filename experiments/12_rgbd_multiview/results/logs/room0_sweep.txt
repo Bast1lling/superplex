@@ -1,0 +1,9 @@
+room0_rgbd_w_unk_0               vIoU 0.599 prec 0.630 rec 0.920 struct 0.711 obj 0.587 fitted 78/79 views 100 24.1s
+room0_rgbd_w_unk_0.03            vIoU 0.613 prec 0.662 rec 0.902 struct 0.710 obj 0.603 fitted 78/79 views 100 24.4s
+room0_rgbd_w_unk_0.3             vIoU 0.618 prec 0.690 rec 0.877 struct 0.677 obj 0.612 fitted 78/79 views 100 24.3s
+room0_rgbd_w_unk_1               vIoU 0.594 prec 0.695 rec 0.830 struct 0.646 obj 0.588 fitted 78/79 views 100 24.4s
+room0_rgbd_thick_0.05            vIoU 0.544 prec 0.666 rec 0.744 struct 0.466 obj 0.551 fitted 77/79 views 100 24.5s
+room0_rgbd_thick_0.2             vIoU 0.624 prec 0.654 rec 0.930 struct 0.735 obj 0.613 fitted 78/79 views 100 24.3s
+room0_rgbd_frames_stride5        vIoU 0.630 prec 0.689 rec 0.897 struct 0.699 obj 0.623 fitted 78/79 views 400 31.4s
+room0_rgbd_frames_stride50       vIoU 0.626 prec 0.700 rec 0.883 struct 0.689 obj 0.620 fitted 78/79 views 40 23.1s
+room0_rgbd_frames_stride200      vIoU 0.586 prec 0.679 rec 0.838 struct 0.599 obj 0.585 fitted 76/79 views 10 21.9s

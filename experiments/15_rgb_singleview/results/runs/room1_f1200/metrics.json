@@ -1,0 +1,528 @@
+{
+ "summary": {
+  "instances": 51,
+  "fitted": 18,
+  "viou": 0.07172039342684415,
+  "precision": 0.15906324189105375,
+  "recall": 0.10204624926554703,
+  "viou_all": 0.025313080033003813,
+  "viou_structure": 0.01579818905682979,
+  "viou_objects": 0.09322893356915733,
+  "seconds": 29.1,
+  "views": 1
+ },
+ "per_instance": [
+  {
+   "gt_vox": 20059,
+   "fitted": true,
+   "tp": 0,
+   "fp": 1246.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 16403,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 620,
+   "fitted": true,
+   "tp": 278,
+   "fp": 520.0,
+   "iou": 0.24385964912280703,
+   "precision": 0.3483709273182957,
+   "recall": 0.4483870967741935
+  },
+  {
+   "gt_vox": 445,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 20777,
+   "fitted": true,
+   "tp": 2242,
+   "fp": 7606.0,
+   "iou": 0.07899094528414896,
+   "precision": 0.2276604386677498,
+   "recall": 0.1079077826442701
+  },
+  {
+   "gt_vox": 4500,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 644,
+   "fitted": true,
+   "tp": 13,
+   "fp": 132.0,
+   "iou": 0.01675257731958763,
+   "precision": 0.0896551724137931,
+   "recall": 0.020186335403726708
+  },
+  {
+   "gt_vox": 2528,
+   "fitted": true,
+   "tp": 309,
+   "fp": 790.0,
+   "iou": 0.09312839059674503,
+   "precision": 0.28116469517743403,
+   "recall": 0.12223101265822785
+  },
+  {
+   "gt_vox": 935,
+   "fitted": true,
+   "tp": 157,
+   "fp": 324.0,
+   "iou": 0.12470214455917394,
+   "precision": 0.3264033264033264,
+   "recall": 0.1679144385026738
+  },
+  {
+   "gt_vox": 5188,
+   "fitted": true,
+   "tp": 2234,
+   "fp": 728.0,
+   "iou": 0.37762001352265046,
+   "precision": 0.7542201215395004,
+   "recall": 0.43060909791827295
+  },
+  {
+   "gt_vox": 2387,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 2563,
+   "fitted": true,
+   "tp": 45,
+   "fp": 1002.0,
+   "iou": 0.012622720897615708,
+   "precision": 0.04297994269340974,
+   "recall": 0.017557549746390948
+  },
+  {
+   "gt_vox": 608,
+   "fitted": true,
+   "tp": 158,
+   "fp": 291.0,
+   "iou": 0.1757508342602892,
+   "precision": 0.3518930957683742,
+   "recall": 0.2598684210526316
+  },
+  {
+   "gt_vox": 9,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 5331,
+   "fitted": true,
+   "tp": 0,
+   "fp": 5628.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 15,
+   "fitted": true,
+   "tp": 0,
+   "fp": 32.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 27,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 984,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 75,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 10683,
+   "fitted": true,
+   "tp": 0,
+   "fp": 545.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 11569,
+   "fitted": true,
+   "tp": 0,
+   "fp": 14933.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1300,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 5163,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 19240,
+   "fitted": true,
+   "tp": 0,
+   "fp": 5604.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 648,
+   "fitted": true,
+   "tp": 0,
+   "fp": 8600.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 4984,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 2514,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 573,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 672,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 10,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 8453,
+   "fitted": true,
+   "tp": 939,
+   "fp": 2225.0,
+   "iou": 0.08793781607042517,
+   "precision": 0.2967762326169406,
+   "recall": 0.11108482195670176
+  },
+  {
+   "gt_vox": 354,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 49,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 4468,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 2356,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 743,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1273,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 56,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 108,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1342,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 13,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1059,
+   "fitted": true,
+   "tp": 160,
+   "fp": 951.0,
+   "iou": 0.07960199004975124,
+   "precision": 0.14401440144014402,
+   "recall": 0.1510859301227573
+  },
+  {
+   "gt_vox": 1302,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 713,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 13,
+   "fitted": true,
+   "tp": 0,
+   "fp": 163.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 172,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 950,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1321,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 413,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 548,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 31143,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  }
+ ],
+ "names": [
+  "floor",
+  "wall",
+  "pillow",
+  "basket",
+  "wall",
+  "door",
+  "pillow",
+  "nightstand",
+  "pillow",
+  "comforter",
+  "blanket",
+  "picture",
+  "pillow",
+  "wall-plug",
+  "blinds",
+  "wall-plug",
+  "book",
+  "pillow",
+  "book",
+  "rug",
+  "wall",
+  "lamp",
+  "blinds",
+  "wall",
+  "window",
+  "blinds",
+  "nightstand",
+  "window",
+  "vent",
+  "switch",
+  "bed",
+  "vent",
+  "book",
+  "cabinet",
+  "window",
+  "pillow",
+  "lamp",
+  "panel",
+  "plate",
+  "lamp",
+  "wall-plug",
+  "lamp",
+  "blanket",
+  "pillow",
+  "wall-plug",
+  "vase",
+  "lamp",
+  "lamp",
+  "indoor-plant",
+  "window",
+  "ceiling"
+ ]
+}

@@ -1,0 +1,808 @@
+{
+ "summary": {
+  "instances": 79,
+  "fitted": 45,
+  "viou": 0.45807476552972665,
+  "precision": 0.724473165106453,
+  "recall": 0.577333656434843,
+  "viou_all": 0.260928663909338,
+  "viou_structure": 0.2044695175494288,
+  "viou_objects": 0.4970909575266956,
+  "seconds": 22.1,
+  "views": 1
+ },
+ "per_instance": [
+  {
+   "gt_vox": 5845,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 23,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 72,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 531,
+   "fitted": true,
+   "tp": 348,
+   "fp": 198.0,
+   "iou": 0.4773662551440329,
+   "precision": 0.6373626373626373,
+   "recall": 0.655367231638418
+  },
+  {
+   "gt_vox": 832,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 292,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 617,
+   "fitted": true,
+   "tp": 373,
+   "fp": 116.0,
+   "iou": 0.5088676671214188,
+   "precision": 0.7627811860940695,
+   "recall": 0.6045380875202593
+  },
+  {
+   "gt_vox": 13069,
+   "fitted": true,
+   "tp": 3181,
+   "fp": 2872.0,
+   "iou": 0.19954833448340756,
+   "precision": 0.5255245332892781,
+   "recall": 0.24340041319152192
+  },
+  {
+   "gt_vox": 326,
+   "fitted": true,
+   "tp": 20,
+   "fp": 10.0,
+   "iou": 0.05952380952380952,
+   "precision": 0.6666666666666666,
+   "recall": 0.06134969325153374
+  },
+  {
+   "gt_vox": 3765,
+   "fitted": true,
+   "tp": 1713,
+   "fp": 2571.0,
+   "iou": 0.2703598484848485,
+   "precision": 0.39985994397759106,
+   "recall": 0.4549800796812749
+  },
+  {
+   "gt_vox": 19,
+   "fitted": true,
+   "tp": 8,
+   "fp": 0.0,
+   "iou": 0.42105263157894735,
+   "precision": 1.0,
+   "recall": 0.42105263157894735
+  },
+  {
+   "gt_vox": 536,
+   "fitted": true,
+   "tp": 405,
+   "fp": 71.0,
+   "iou": 0.6672158154859967,
+   "precision": 0.8508403361344538,
+   "recall": 0.7555970149253731
+  },
+  {
+   "gt_vox": 4988,
+   "fitted": true,
+   "tp": 4638,
+   "fp": 127.0,
+   "iou": 0.9067448680351906,
+   "precision": 0.9733473242392445,
+   "recall": 0.929831595829992
+  },
+  {
+   "gt_vox": 38,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 727,
+   "fitted": true,
+   "tp": 622,
+   "fp": 1104.0,
+   "iou": 0.3397050791916985,
+   "precision": 0.3603707995365006,
+   "recall": 0.8555708390646493
+  },
+  {
+   "gt_vox": 496,
+   "fitted": true,
+   "tp": 271,
+   "fp": 66.0,
+   "iou": 0.4822064056939502,
+   "precision": 0.8041543026706232,
+   "recall": 0.5463709677419355
+  },
+  {
+   "gt_vox": 4887,
+   "fitted": true,
+   "tp": 4658,
+   "fp": 109.0,
+   "iou": 0.932345876701361,
+   "precision": 0.9771344661212502,
+   "recall": 0.9531409862901575
+  },
+  {
+   "gt_vox": 2318,
+   "fitted": true,
+   "tp": 2240,
+   "fp": 414.0,
+   "iou": 0.8199121522693997,
+   "precision": 0.8440090429540317,
+   "recall": 0.9663503019844694
+  },
+  {
+   "gt_vox": 4940,
+   "fitted": true,
+   "tp": 3257,
+   "fp": 0.0,
+   "iou": 0.6593117408906882,
+   "precision": 1.0,
+   "recall": 0.6593117408906882
+  },
+  {
+   "gt_vox": 36843,
+   "fitted": true,
+   "tp": 2416,
+   "fp": 300.0,
+   "iou": 0.06504590366960127,
+   "precision": 0.8895434462444771,
+   "recall": 0.06557555030806395
+  },
+  {
+   "gt_vox": 633,
+   "fitted": true,
+   "tp": 483,
+   "fp": 71.0,
+   "iou": 0.6860795454545454,
+   "precision": 0.871841155234657,
+   "recall": 0.7630331753554502
+  },
+  {
+   "gt_vox": 328,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 602,
+   "fitted": true,
+   "tp": 436,
+   "fp": 489.0,
+   "iou": 0.3996333638863428,
+   "precision": 0.47135135135135137,
+   "recall": 0.7242524916943521
+  },
+  {
+   "gt_vox": 782,
+   "fitted": true,
+   "tp": 282,
+   "fp": 224.0,
+   "iou": 0.2803180914512923,
+   "precision": 0.5573122529644269,
+   "recall": 0.36061381074168797
+  },
+  {
+   "gt_vox": 4894,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 18,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 640,
+   "fitted": true,
+   "tp": 347,
+   "fp": 144.0,
+   "iou": 0.44260204081632654,
+   "precision": 0.7067209775967414,
+   "recall": 0.5421875
+  },
+  {
+   "gt_vox": 28931,
+   "fitted": true,
+   "tp": 6664,
+   "fp": 2617.0,
+   "iou": 0.21123367566882212,
+   "precision": 0.718026074776425,
+   "recall": 0.23034115654488266
+  },
+  {
+   "gt_vox": 2283,
+   "fitted": true,
+   "tp": 1043,
+   "fp": 100.0,
+   "iou": 0.4376835921107847,
+   "precision": 0.9125109361329834,
+   "recall": 0.4568550153307052
+  },
+  {
+   "gt_vox": 282,
+   "fitted": true,
+   "tp": 204,
+   "fp": 252.0,
+   "iou": 0.38202247191011235,
+   "precision": 0.4473684210526316,
+   "recall": 0.723404255319149
+  },
+  {
+   "gt_vox": 4228,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 634,
+   "fitted": true,
+   "tp": 584,
+   "fp": 506.0,
+   "iou": 0.512280701754386,
+   "precision": 0.5357798165137615,
+   "recall": 0.9211356466876972
+  },
+  {
+   "gt_vox": 1754,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1363,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1760,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 485,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 176,
+   "fitted": true,
+   "tp": 169,
+   "fp": 45.0,
+   "iou": 0.7647058823529411,
+   "precision": 0.7897196261682243,
+   "recall": 0.9602272727272727
+  },
+  {
+   "gt_vox": 10,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 323,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1113,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 19462,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1282,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 2568,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 39,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 8,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 20137,
+   "fitted": true,
+   "tp": 4540,
+   "fp": 13137.0,
+   "iou": 0.13644286830558394,
+   "precision": 0.2568309102223228,
+   "recall": 0.22545562894174903
+  },
+  {
+   "gt_vox": 4715,
+   "fitted": true,
+   "tp": 3122,
+   "fp": 0.0,
+   "iou": 0.6621420996818664,
+   "precision": 1.0,
+   "recall": 0.6621420996818664
+  },
+  {
+   "gt_vox": 95,
+   "fitted": true,
+   "tp": 79,
+   "fp": 19.0,
+   "iou": 0.6929824561403509,
+   "precision": 0.8061224489795918,
+   "recall": 0.8315789473684211
+  },
+  {
+   "gt_vox": 20422,
+   "fitted": true,
+   "tp": 6293,
+   "fp": 1115.0,
+   "iou": 0.2921948275061522,
+   "precision": 0.849487041036717,
+   "recall": 0.30814807560474
+  },
+  {
+   "gt_vox": 2256,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 657,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 4486,
+   "fitted": true,
+   "tp": 1772,
+   "fp": 137.0,
+   "iou": 0.38330088686999786,
+   "precision": 0.928234677841802,
+   "recall": 0.3950066874721355
+  },
+  {
+   "gt_vox": 201,
+   "fitted": true,
+   "tp": 66,
+   "fp": 18.0,
+   "iou": 0.3013698630136986,
+   "precision": 0.7857142857142857,
+   "recall": 0.3283582089552239
+  },
+  {
+   "gt_vox": 125,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 214,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 205,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 298,
+   "fitted": true,
+   "tp": 256,
+   "fp": 33.0,
+   "iou": 0.7734138972809668,
+   "precision": 0.8858131487889274,
+   "recall": 0.8590604026845637
+  },
+  {
+   "gt_vox": 477,
+   "fitted": true,
+   "tp": 432,
+   "fp": 177.0,
+   "iou": 0.6605504587155964,
+   "precision": 0.7093596059113301,
+   "recall": 0.9056603773584906
+  },
+  {
+   "gt_vox": 488,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 288,
+   "fitted": true,
+   "tp": 237,
+   "fp": 66.0,
+   "iou": 0.6694915254237288,
+   "precision": 0.7821782178217822,
+   "recall": 0.8229166666666666
+  },
+  {
+   "gt_vox": 4726,
+   "fitted": true,
+   "tp": 2358,
+   "fp": 1777.0,
+   "iou": 0.36260187605720434,
+   "precision": 0.5702539298669891,
+   "recall": 0.4989420228523064
+  },
+  {
+   "gt_vox": 4694,
+   "fitted": true,
+   "tp": 2366,
+   "fp": 1685.0,
+   "iou": 0.3709045304906725,
+   "precision": 0.5840533201678598,
+   "recall": 0.504047720494248
+  },
+  {
+   "gt_vox": 714,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 12996,
+   "fitted": true,
+   "tp": 4878,
+   "fp": 2028.0,
+   "iou": 0.3246805111821086,
+   "precision": 0.7063423110338836,
+   "recall": 0.37534626038781166
+  },
+  {
+   "gt_vox": 1317,
+   "fitted": true,
+   "tp": 570,
+   "fp": 22.0,
+   "iou": 0.4256908140403286,
+   "precision": 0.9628378378378378,
+   "recall": 0.4328018223234624
+  },
+  {
+   "gt_vox": 183,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 12,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 15,
+   "fitted": true,
+   "tp": 7,
+   "fp": 1.0,
+   "iou": 0.4375,
+   "precision": 0.875,
+   "recall": 0.4666666666666667
+  },
+  {
+   "gt_vox": 1307,
+   "fitted": true,
+   "tp": 869,
+   "fp": 0.0,
+   "iou": 0.6648814078041316,
+   "precision": 1.0,
+   "recall": 0.6648814078041316
+  },
+  {
+   "gt_vox": 1929,
+   "fitted": true,
+   "tp": 1019,
+   "fp": 275.0,
+   "iou": 0.46234119782214156,
+   "precision": 0.7874806800618238,
+   "recall": 0.5282529808190772
+  },
+  {
+   "gt_vox": 49,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 1215,
+   "fitted": true,
+   "tp": 636,
+   "fp": 343.0,
+   "iou": 0.40821566110397944,
+   "precision": 0.6496424923391215,
+   "recall": 0.5234567901234568
+  },
+  {
+   "gt_vox": 551,
+   "fitted": true,
+   "tp": 304,
+   "fp": 271.0,
+   "iou": 0.36982968369829683,
+   "precision": 0.528695652173913,
+   "recall": 0.5517241379310345
+  },
+  {
+   "gt_vox": 58141,
+   "fitted": true,
+   "tp": 11403,
+   "fp": 539.0,
+   "iou": 0.19432515337423312,
+   "precision": 0.9548651817116061,
+   "recall": 0.19612665760822828
+  },
+  {
+   "gt_vox": 11475,
+   "fitted": true,
+   "tp": 8817,
+   "fp": 15441.0,
+   "iou": 0.3275746767721801,
+   "precision": 0.3634677219886223,
+   "recall": 0.7683660130718954
+  },
+  {
+   "gt_vox": 60,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  {
+   "gt_vox": 596,
+   "fitted": true,
+   "tp": 268,
+   "fp": 688.0,
+   "iou": 0.2087227414330218,
+   "precision": 0.2803347280334728,
+   "recall": 0.44966442953020136
+  },
+  {
+   "gt_vox": 52,
+   "fitted": true,
+   "tp": 43,
+   "fp": 25.0,
+   "iou": 0.5584415584415584,
+   "precision": 0.6323529411764706,
+   "recall": 0.8269230769230769
+  },
+  {
+   "gt_vox": 367,
+   "fitted": false,
+   "tp": 0,
+   "fp": 0.0,
+   "iou": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  }
+ ],
+ "names": [
+  "cabinet",
+  "book",
+  "book",
+  "cushion",
+  "lamp",
+  "table",
+  "cushion",
+  "sofa",
+  "table",
+  "table",
+  "book",
+  "cushion",
+  "blinds",
+  "switch",
+  "window",
+  "cushion",
+  "blinds",
+  "blinds",
+  "blinds",
+  "floor",
+  "window",
+  "table",
+  "window",
+  "window",
+  "blinds",
+  "wall-plug",
+  "cushion",
+  "wall",
+  "blinds",
+  "indoor-plant",
+  "door",
+  "window",
+  "stool",
+  "lamp",
+  "stool",
+  "window",
+  "pot",
+  "wall-plug",
+  "vase",
+  "pillar",
+  "wall",
+  "lamp",
+  "blinds",
+  "plant-stand",
+  "wall-plug",
+  "wall",
+  "blinds",
+  "book",
+  "rug",
+  "window",
+  "window",
+  "picture",
+  "vent",
+  "plate",
+  "plate",
+  "vent",
+  "cushion",
+  "cushion",
+  "cushion",
+  "cushion",
+  "chair",
+  "chair",
+  "basket",
+  "sofa",
+  "lamp",
+  "candle",
+  "wall-plug",
+  "wall-plug",
+  "lamp",
+  "pillar",
+  "book",
+  "blanket",
+  "lamp",
+  "ceiling",
+  "wall",
+  "book",
+  "window",
+  "book",
+  "table"
+ ]
+}

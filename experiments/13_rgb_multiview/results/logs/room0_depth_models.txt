@@ -1,0 +1,25 @@
+| run | instances | vIoU | prec | rec | upper bound (same instances) | rel |
+|---|---|---|---|---|---|---|
+| 12:room0_rgbd_thick_0.1_outside_free_1 | 78 | 0.623 | 0.682 | 0.892 | 0.707 | 0.88 |
+| 13:room0_depthpro_stride20 | 78 | 0.400 | 0.456 | 0.863 | 0.707 | 0.57 |
+| 13:room0_depthpro_ownfocal_stride20 | 77 | 0.338 | 0.393 | 0.817 | 0.707 | 0.48 |
+| 13:room0_dav2_stride20 | 76 | 0.001 | 0.001 | 0.003 | 0.710 | 0.00 |
+| run | instances | vIoU | prec | rec | upper bound (same instances) | rel |
+|---|---|---|---|---|---|---|
+| 12:room0_rgbd_thick_0.1_outside_free_1 | 78 | 0.623 | 0.682 | 0.892 | 0.707 | 0.88 |
+| 13:room0_depthpro_stride20 | 78 | 0.400 | 0.456 | 0.863 | 0.707 | 0.57 |
+| 13:room0_depthpro_align_stride20 | 78 | 0.476 | 0.536 | 0.883 | 0.707 | 0.67 |
+| 13:room0_dav2_align_stride20 | 77 | 0.171 | 0.235 | 0.365 | 0.712 | 0.24 |
+| run | instances | vIoU | prec | rec | upper bound (same instances) | rel |
+|---|---|---|---|---|---|---|
+| 13:room0_depthpro_align_stride20 | 78 | 0.476 | 0.536 | 0.883 | 0.707 | 0.67 |
+| 13:room0_depthpro_align_erode_1 | 65 | 0.532 | 0.664 | 0.766 | 0.741 | 0.72 |
+| 13:room0_depthpro_align_erode_2 | 58 | 0.512 | 0.712 | 0.688 | 0.746 | 0.69 |
+| 13:room0_depthpro_align_min_votes_3 | 77 | 0.470 | 0.554 | 0.834 | 0.707 | 0.66 |
+| 13:room0_depthpro_align_rel_band_0.03 | 78 | 0.405 | 0.443 | 0.903 | 0.707 | 0.57 |
+| 13:room0_depthpro_align_erode_1_min_votes_3 | 62 | 0.526 | 0.673 | 0.734 | 0.732 | 0.72 |
+| run | instances | vIoU | prec | rec | upper bound (same instances) | rel |
+|---|---|---|---|---|---|---|
+| 13:room0_depthpro_align_erode_1_fb | 78 | 0.490 | 0.609 | 0.777 | 0.707 | 0.69 |
+| 13:room0_depthpro_align_erode_2_fb | 78 | 0.454 | 0.606 | 0.725 | 0.707 | 0.64 |
+| 12:room0_rgbd_erode_1_fb | 78 | 0.630 | 0.746 | 0.804 | 0.707 | 0.89 |

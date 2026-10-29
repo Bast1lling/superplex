@@ -1,0 +1,14 @@
+{
+ "scene": "room_0",
+ "source": "views",
+ "depth": "gt",
+ "frames": "stride20",
+ "w_unk": 0.1,
+ "res": 0.04,
+ "steps": 2000,
+ "tau": 0.02,
+ "margin": 0.2,
+ "min_vox": 4,
+ "thick": 0.1,
+ "outside_free": 1
+}
