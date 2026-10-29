@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SuperFlex Objective Runs</title>
+<style>
+  :root { --bg: #15181d; --panel: rgba(28, 32, 39, 0.94); --fg: #e6e8eb; --muted: #9aa3ad; --accent: #5aa9ff; --line: #3a414b; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  #panel { position: absolute; top: 12px; left: 12px; width: 260px; background: var(--panel); border: 1px solid var(--line);
+           border-radius: 8px; padding: 12px 14px; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  .row { margin: 8px 0; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  select, input[type=range] { width: 100%; }
+  #methods { display: grid; grid-template-columns: 1fr; gap: 4px; }
+  #methods button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 5px 4px;
+                    cursor: pointer; font: inherit; text-align: left; }
+  #methods button.on { border-color: var(--accent); background: rgba(90, 169, 255, 0.15); }
+  #methods button:disabled { opacity: .35; cursor: default; }
+  #methods small { color: var(--muted); display: block; }
+  label { display: block; cursor: pointer; }
+  #status, #info { color: var(--muted); margin-top: 8px; }
+  #info table { width: 100%; border-collapse: collapse; } #info td { padding: 1px 0; } #info td:last-child { text-align: right; }
+  #info b { color: var(--fg); }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Exp 16: SuperFlex objective</h1>
+  <div class="row"><div class="label">Scene</div><select id="scene"></select></div>
+  <div class="row"><div class="label">Run: initialization / objective (keys 1–9, 0)</div><div id="methods"></div></div>
+  <div class="row"><div class="label">Color primitives by</div>
+    <select id="colorBy"><option value="inst">instance</option><option value="prim">primitive</option><option value="iou">instance IoU (red 0 → green 1)</option></select></div>
+  <div class="row"><div class="label">Show</div>
+    <label><input type="checkbox" id="showSq" checked> superquadrics</label>
+    <label><input type="checkbox" id="showPts"> points</label>
+    <label><input type="checkbox" id="showVox"> solid voxels</label>
+    <label><input type="checkbox" id="instColor"> points by instance</label>
+  </div>
+  <div class="row"><div class="label">SQ opacity</div><input type="range" id="opacity" min="0.1" max="1" step="0.05" value="1"></div>
+  <div class="row"><div class="label">Cut height</div><input type="range" id="cut" min="0" max="1" step="0.01" value="0.8"></div>
+  <div id="status">loading…</div>
+  <div id="info">click an object for its IoU in every run</div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const METHODS = ['network_nooptim', 'network_theirs', 'network_ours', 'kmeans_net_theirs', 'kmeans_net_ours', 'kmeans16_theirs', 'kmeans16_ours',
+                 'network_theirs_plain', 'kmeans_net_theirs_plain', 'kmeans16_theirs_plain'];
+const TITLE = { network_nooptim: 'network, no optimization', network_theirs: 'network / theirs', network_ours: 'network / ours',
+  kmeans_net_theirs: 'k-means (net count) / theirs', kmeans_net_ours: 'k-means (net count) / ours',
+  kmeans16_theirs: 'k-means 16 + prune / theirs', kmeans16_ours: 'k-means 16 + prune / ours', network_theirs_plain: 'network / theirs, plain SQs',
+  kmeans_net_theirs_plain: 'k-means (net count) / theirs, plain SQs', kmeans16_theirs_plain: 'k-means 16 + prune / theirs, plain SQs' };
+const $ = id => document.getElementById(id);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.localClippingEnabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15181d);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 200);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(3, 2, 6);
+scene.add(sun);
+const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 100);  // keeps z <= constant
+
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+// golden-ratio hues: neighbouring ids get distinct colors; -1 = no instance
+const color = i => i < 0 ? new THREE.Color(0x888888) : new THREE.Color().setHSL((i * 0.618034) % 1, 0.6, 0.55);
+
+let data = null, method = null, layers = {}, zRange = [0, 1];
+
+function meshObject(pos, col, idx) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(Array.isArray(idx) ? idx : new THREE.BufferAttribute(idx, 1));
+  g.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8, clippingPlanes: [clip], transparent: true });
+  return new THREE.Mesh(g, mat);
+}
+
+// tapered / bent primitives meshed by export.py (vertices f32, faces u32, instance i16 and primitive u16 per vertex)
+const iouColor = v => new THREE.Color().setHSL(0.33 * Math.max(0, Math.min(1, v)), 0.75, 0.5);
+async function deformedMesh(m) {
+  const { mesh: [nv, nf] } = data.runs[m];
+  const buf = await fetch(data.base + m + '.bin').then(r => r.arrayBuffer());
+  const inst = new Int16Array(buf, nv * 12 + nf * 12, nv), prim = new Uint16Array(buf, nv * 14 + nf * 12, nv);
+  const obj = meshObject(new Float32Array(buf, 0, nv * 3), new Float32Array(nv * 3), new Uint32Array(buf, nv * 12, nf * 3));
+  obj.userData = { inst, prim, run: m };
+  return obj;
+}
+
+function colorMesh(obj) {
+  const { inst, prim, run } = obj.userData, a = obj.geometry.attributes.color, by = $('colorBy').value, iou = data.runs[run].iou;
+  const cache = new Map();
+  for (let i = 0; i < inst.length; i++) {
+    const key = by === 'prim' ? prim[i] : inst[i];
+    if (!cache.has(key)) cache.set(key, by === 'iou' ? iouColor(iou[inst[i]] ?? 0) : color(key));
+    const c = cache.get(key);
+    a.array[3 * i] = c.r; a.array[3 * i + 1] = c.g; a.array[3 * i + 2] = c.b;
+  }
+  a.needsUpdate = true;
+}
+
+function pointsLayer(buf, n) {
+  const xyz = new Float32Array(buf, 0, n * 3), inst = new Int16Array(buf, n * 12, n), rgb = new Uint8Array(buf, n * 14, n * 3);
+  const rgbF = Float32Array.from(rgb, v => v / 255), instF = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const c = color(inst[i]); instF.set([c.r, c.g, c.b], i * 3); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(xyz, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(rgbF, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.02, vertexColors: true, clippingPlanes: [clip] }));
+  pts.userData = { rgbF, instF };
+  return pts;
+}
+
+function voxelLayer(buf, n, meta) {
+  const idx = new Int16Array(buf, 0, n * 3), lab = new Int16Array(buf, n * 6, n), r = meta.res;
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(r * 0.95, r * 0.95, r * 0.95),
+    new THREE.MeshStandardMaterial({ roughness: 0.9, clippingPlanes: [clip] }), n);
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < n; i++) {
+    m.makeTranslation(meta.lo[0] + idx[3 * i] * r, meta.lo[1] + idx[3 * i + 1] * r, meta.lo[2] + idx[3 * i + 2] * r);
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, color(lab[i]));
+  }
+  return mesh;
+}
+
+async function setMethod(m) {
+  if (!data || !data.runs[m]) return;
+  method = m;
+  const sq = await deformedMesh(m);
+  if (method !== m) return;
+  if (layers.sq) { scene.remove(layers.sq); layers.sq.geometry.dispose(); }
+  layers.sq = sq;
+  colorMesh(sq);
+  scene.add(layers.sq);
+  document.querySelectorAll('#methods button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  update();
+}
+
+function update() {
+  if (layers.sq) { layers.sq.visible = $('showSq').checked; layers.sq.material.opacity = +$('opacity').value;
+                   layers.sq.material.depthWrite = +$('opacity').value > 0.99; }
+  if (layers.pts) { layers.pts.visible = $('showPts').checked;
+                    const u = layers.pts.userData, a = layers.pts.geometry.attributes.color;
+                    a.array = $('instColor').checked ? u.instF : u.rgbF; a.needsUpdate = true; }
+  if (layers.vox) layers.vox.visible = $('showVox').checked;
+  clip.constant = zRange[0] + $('cut').value * (zRange[1] - zRange[0]) + 1e-3;
+}
+
+async function loadScene(name) {
+  $('status').textContent = 'loading ' + name + '…';
+  for (const k in layers) { scene.remove(layers[k]); layers[k].geometry.dispose(); }
+  layers = {};
+  const base = 'data/' + name + '/';
+  const get = f => fetch(base + f).then(r => r.arrayBuffer());
+  const [meta, pbuf, vbuf] = await Promise.all([fetch(base + 'scene.json').then(r => r.json()),
+    get('points.bin'), get('voxels.bin')]);
+  data = meta;
+  data.base = base;
+  layers.pts = pointsLayer(pbuf, meta.points);
+  layers.vox = voxelLayer(vbuf, meta.voxels, meta);
+  scene.add(layers.pts, layers.vox);
+  const box = new THREE.Box3().setFromBufferAttribute(layers.pts.geometry.attributes.position);
+  zRange = [box.min.z, box.max.z];
+  const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+  controls.target.copy(c);
+  camera.position.set(c.x + 0.2 * s.x, c.y - 1.2 * s.y, c.z + 1.4 * Math.max(s.x, s.y));
+  $('methods').innerHTML = '';
+  METHODS.forEach((m, i) => {
+    const b = document.createElement('button');
+    b.dataset.m = m;
+    const r = meta.runs[m];
+    b.disabled = !r;
+    b.innerHTML = `${i + 1} ${TITLE[m]}<small>${r ? `vIoU ${r.summary.viou.toFixed(3)} · P ${r.summary.precision.toFixed(2)} · R ${r.summary.recall.toFixed(2)} · ${r.count} prims` : 'not run yet'}</small>`;
+    b.onclick = () => setMethod(m);
+    $('methods').appendChild(b);
+  });
+  setMethod(method && meta.runs[method] ? method : METHODS.find(m => meta.runs[m]));
+  $('info').textContent = 'click an object for its IoU in every run';
+  $('status').textContent = `${meta.points.toLocaleString()} points, ${meta.voxels.toLocaleString()} surface voxels`;
+}
+
+['showSq', 'showPts', 'showVox', 'instColor', 'opacity', 'cut'].forEach(id => $(id).addEventListener('input', update));
+$('colorBy').addEventListener('input', () => layers.sq && colorMesh(layers.sq));
+$('scene').addEventListener('change', e => loadScene(e.target.value));
+addEventListener('keydown', e => { const i = '1234567890'.indexOf(e.key); if (i >= 0) setMethod(METHODS[i]); });
+
+// click (without dragging) on a primitive: its instance's IoU in every run
+const ray = new THREE.Raycaster(), down = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', e => down.set(e.clientX, e.clientY));
+renderer.domElement.addEventListener('click', e => {
+  if (!layers.sq || down.distanceTo(new THREE.Vector2(e.clientX, e.clientY)) > 4) return;
+  ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1), camera);
+  const hit = ray.intersectObject(layers.sq).find(h => h.point.z <= clip.constant);
+  if (!hit) return;
+  const k = layers.sq.userData.inst[hit.face.a];
+  $('info').innerHTML = `<b>instance ${k}: ${data.names[k]}</b><table>` + METHODS.filter(m => data.runs[m]).map(m =>
+    `<tr><td>${m === method ? '<b>' + TITLE[m] + '</b>' : TITLE[m]}</td><td>${(data.runs[m].iou[k] ?? 0).toFixed(3)}</td></tr>`).join('') + '</table>';
+});
+
+const scenes = await fetch('data/index.json').then(r => r.json());
+$('scene').innerHTML = scenes.map(s => `<option>${s}</option>`).join('');
+loadScene(scenes.includes('room_0') ? 'room_0' : scenes[0]);
+</script>
+</body>
+</html>

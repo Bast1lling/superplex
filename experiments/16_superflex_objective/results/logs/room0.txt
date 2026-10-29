@@ -1,0 +1,6 @@
+room0_network_nooptim {"instances": 79, "viou": 0.33018423967494387, "precision": 0.743212567898783, "recall": 0.37715944503151366, "primitives": 250, "seconds": 21.6}
+room0_network_ours {"instances": 79, "viou": 0.760535564809994, "precision": 0.7875090441378501, "recall": 0.954599696910838, "primitives": 250, "seconds": 94.7}
+room0_kmeans_net_theirs {"instances": 79, "viou": 0.798910805588446, "precision": 0.9163569081878035, "recall": 0.8563971972282712, "primitives": 250, "seconds": 98.6}
+room0_kmeans_net_ours {"instances": 79, "viou": 0.7460554844047966, "precision": 0.776934400149027, "recall": 0.9529199597157352, "primitives": 250, "seconds": 95.3}
+room0_kmeans16_theirs {"instances": 79, "viou": 0.7910593953852276, "precision": 0.980964517842635, "recall": 0.8052842020508499, "primitives": 1130, "seconds": 98.7}
+room0_kmeans16_ours {"instances": 79, "viou": 0.6174056314948118, "precision": 0.7140224240733622, "recall": 0.8685026059937051, "primitives": 827, "seconds": 95.7}
