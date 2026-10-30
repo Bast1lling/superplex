@@ -1,6 +1,6 @@
-"""superflex: SuperFlex (ECCV 2026, papers/superflex) run on every GT instance separately, results merged.
+"""network: SuperFlex (ECCV 2026, papers/superflex) run on every GT instance separately, results merged.
 
-    python superflex.py [--res 0.02] [scene ...]      -> superflex_<checkpoint> for every checkpoint in CHECKPOINTS
+    python network.py [--res 0.02] [scene ...]      -> superflex_<checkpoint> for every checkpoint in CHECKPOINTS
 
 Per instance: 4096 of its points (with repetition if it has fewer), centered and scaled to unit size (SuperFlex's
 normalize_points), rotated from z-up to the network's y-up (as in its scene pipeline); all instances in one batch.
@@ -37,11 +37,11 @@ def load_model(name):
     return model.eval()
 
 
-def instance_batch(pts, seed=0):
-    """(I, N_POINTS, 3) normalized, y-up points per instance, and the centers / scales to undo it."""
+def instance_batch(pts, ks=None, seed=0):
+    """(I, N_POINTS, 3) normalized, y-up points per instance (all, or those in ks), and the centers / scales to undo it."""
     rng = np.random.default_rng(seed)
     batch, centers, scales = [], [], []
-    for k in range(pts["inst"].max() + 1):
+    for k in range(pts["inst"].max() + 1) if ks is None else ks:
         p = pts["pos"][pts["inst"] == k].astype(np.float64)
         p = p[rng.choice(len(p), N_POINTS, replace=len(p) < N_POINTS)]
         c = p.mean(0)

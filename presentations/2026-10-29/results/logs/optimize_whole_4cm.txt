@@ -1,0 +1,4 @@
+room_1 scene_kmeans_net: 144 SQs (count 144), scene IoU 0.959 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/scene_kmeans_net.npz
+room_1 scene_kmeans_dbscan: 57 SQs (count 57), scene IoU 0.946 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/scene_kmeans_dbscan.npz
+office_0 scene_kmeans_net: 168 SQs (count 168), scene IoU 0.924 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/scene_kmeans_net.npz
+office_0 scene_kmeans_dbscan: 84 SQs (count 84), scene IoU 0.913 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/scene_kmeans_dbscan.npz

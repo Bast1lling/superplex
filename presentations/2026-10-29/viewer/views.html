@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQ Fits From Views</title>
+<style>
+  :root { --bg: #15181d; --panel: rgba(28, 32, 39, 0.94); --fg: #e6e8eb; --muted: #9aa3ad; --accent: #5aa9ff; --line: #3a414b; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  #panel { top: 12px; left: 12px; width: 250px; max-height: calc(100% - 50px); overflow-y: auto; }
+  #viewPanel { right: 12px; bottom: 12px; width: 320px; display: none; }
+  #viewPanel img { width: 100%; display: block; border-radius: 4px; margin-top: 6px; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  .row { margin: 8px 0; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  select, input[type=range] { width: 100%; }
+  #settings { display: grid; gap: 4px; }
+  button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 5px 6px;
+           cursor: pointer; font: inherit; text-align: left; }
+  button.on { border-color: var(--accent); background: rgba(90, 169, 255, 0.15); }
+  button:disabled { opacity: .35; cursor: default; }
+  button small { color: var(--muted); display: block; }
+  label { display: block; cursor: pointer; }
+  #status, .hint { color: var(--muted); margin-top: 8px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel" class="panel">
+  <h1>SQs from rendered views</h1>
+  <div class="row"><div class="label">Scene</div><select id="scene"></select></div>
+  <div class="row"><div class="label">Input (keys 1–7)</div><div id="settings"></div></div>
+  <div class="row"><div class="label">Show</div>
+    <label><input type="checkbox" id="showSq" checked> superquadrics</label>
+    <label><input type="checkbox" id="showPts"> input points (back-projected)</label>
+    <label><input type="checkbox" id="instColor"> points by instance</label>
+    <label><input type="checkbox" id="showGt"> GT points</label>
+    <label><input type="checkbox" id="showVox"> solid voxels (carved / GT)</label>
+    <label><input type="checkbox" id="showUnk"> never-seen space (boundary)</label>
+    <label><input type="checkbox" id="showCams" checked> cameras</label>
+  </div>
+  <div class="row"><div class="label">SQ opacity</div><input type="range" id="opacity" min="0.1" max="1" step="0.05" value="1"></div>
+  <div class="row"><div class="label">Cut height</div><input type="range" id="cut" min="0" max="1" step="0.01" value="0.8"></div>
+  <div id="status">loading…</div>
+  <div class="hint">Click a camera for its image; C looks through it, Esc goes back.</div>
+</div>
+<div id="viewPanel" class="panel">
+  <div class="label" id="viewTitle"></div>
+  <label><input type="checkbox" id="showLabel"> instance labels instead of RGB</label>
+  <img id="viewImg" alt="selected view">
+  <div class="row"><button id="lookBtn">Look through this camera (C)</button></div>
+  <div class="row"><div class="label">Image overlay opacity (when looking through)</div>
+    <input type="range" id="overlay" min="0" max="1" step="0.05" value="0.5"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const SETTINGS = ['3d', 'multi', 'f800', 'rgb_multi', 'rgb_f800', 'scene_multi', 'scene_rgb_multi'];
+const TITLE = { '3d': '3D GT points (reference)', multi: 'RGBD, 100 views', f800: 'RGBD, single view (frame 800)',
+  rgb_multi: 'RGB + Depth Pro, 100 views', rgb_f800: 'RGB + Depth Pro, single view (frame 800)',
+  scene_multi: 'no labels: RGBD, 100 views', scene_rgb_multi: 'no labels: RGB + Depth Pro, 100 views' };
+const DEEP = -3;
+const $ = id => document.getElementById(id);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.localClippingEnabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15181d);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 200);
+camera.up.set(0, 0, 1);
+scene.add(camera);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(3, 2, 6);
+scene.add(sun);
+const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 100);  // keeps z <= constant
+
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+renderer.setAnimationLoop(() => { if (controls.enabled) controls.update(); renderer.render(scene, camera); });
+
+// golden-ratio hues (as export_views.py); -1 = no instance
+const color = i => i < 0 ? new THREE.Color(0x888888) : new THREE.Color().setHSL((i * 0.618034) % 1, 0.6, 0.55);
+const bin = url => fetch(url).then(r => r.arrayBuffer());
+
+let base = '', main = null, meta = null, setting = null, layers = {}, gtLayers = {}, zRange = [0, 1], selected = null, look = null;
+
+function meshObject(pos, col, idx) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8, clippingPlanes: [clip], transparent: true });
+  return new THREE.Mesh(g, mat);
+}
+
+// primitives meshed by export.py (vertices f32, faces u32, instance per vertex i16)
+async function sqMesh(url, [nv, nf]) {
+  const buf = await bin(url);
+  const inst = new Int16Array(buf, nv * 12 + nf * 12, nv), col = new Float32Array(nv * 3);
+  for (let i = 0; i < nv; i++) { const c = color(inst[i]); col.set([c.r, c.g, c.b], 3 * i); }
+  return meshObject(new Float32Array(buf, 0, nv * 3), col, new Uint32Array(buf, nv * 12, nf * 3));
+}
+
+function pointsLayer(buf, n, size) {
+  const xyz = new Float32Array(buf, 0, n * 3), inst = new Int16Array(buf, n * 12, n), rgb = new Uint8Array(buf, n * 14, n * 3);
+  const rgbF = Float32Array.from(rgb, v => v / 255), instF = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const c = color(inst[i]); instF.set([c.r, c.g, c.b], i * 3); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(xyz, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(rgbF.slice(), 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size, vertexColors: true, clippingPlanes: [clip] }));
+  pts.userData = { rgbF, instF };
+  pts.frustumCulled = false;
+  return pts;
+}
+
+// voxels (index i16 x3, label i16); solid ones by instance, DEEP ones as a faint gray layer
+function voxelLayers(buf, n, lo, r) {
+  const idx = new Int16Array(buf, 0, n * 3), lab = new Int16Array(buf, n * 6, n), out = {};
+  for (const [key, keep, mat] of [
+    ['vox', l => l >= 0, new THREE.MeshStandardMaterial({ roughness: 0.9, clippingPlanes: [clip] })],
+    ['unk', l => l === DEEP, new THREE.MeshStandardMaterial({ color: 0x9aa3ad, transparent: true, opacity: 0.12, depthWrite: false, clippingPlanes: [clip] })]]) {
+    const ids = [...Array(n).keys()].filter(i => keep(lab[i]));
+    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(r * 0.95, r * 0.95, r * 0.95), mat, Math.max(ids.length, 1));
+    mesh.count = ids.length;
+    const m = new THREE.Matrix4();
+    ids.forEach((i, j) => {
+      mesh.setMatrixAt(j, m.makeTranslation(lo[0] + idx[3 * i] * r, lo[1] + idx[3 * i + 1] * r, lo[2] + idx[3 * i + 2] * r));
+      if (key === 'vox') mesh.setColorAt(j, color(lab[i]));
+    });
+    out[key] = mesh;
+  }
+  return out;
+}
+
+// blobs at the camera centers + a short line in viewing direction (OpenCV: column 2 of the rotation)
+function cameraLayer(c2w) {
+  const group = new THREE.Group();
+  const blobs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial(), c2w.length);
+  const line = [], m = new THREE.Matrix4();
+  c2w.forEach((T, i) => {
+    blobs.setMatrixAt(i, m.makeTranslation(T[0][3], T[1][3], T[2][3]));
+    blobs.setColorAt(i, new THREE.Color(i === selected ? 0xffcc33 : 0x6aa8ff));
+    line.push(T[0][3], T[1][3], T[2][3], T[0][3] + 0.25 * T[0][2], T[1][3] + 0.25 * T[1][2], T[2][3] + 0.25 * T[2][2]);
+  });
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.Float32BufferAttribute(line, 3));
+  group.add(blobs, new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x6aa8ff })));
+  group.userData.blobs = blobs;
+  return group;
+}
+
+function clearLayers(ls) { for (const k in ls) { scene.remove(ls[k]); ls[k].traverse?.(o => o.geometry?.dispose()); } }
+
+let loading = null;  // the scene being loaded: an older load that finishes later is dropped
+async function loadScene(name) {
+  loading = name;
+  $('status').textContent = 'loading ' + name + '…';
+  leaveLook();
+  clearLayers(layers); clearLayers(gtLayers); layers = {}; gtLayers = {};
+  base = 'data/' + name + '/';
+  const sceneBase = base;
+  const meta0 = await fetch(sceneBase + 'scene.json').then(r => r.json());
+  const [pbuf, vbuf] = await Promise.all([bin(sceneBase + 'points.bin'), bin(sceneBase + 'voxels.bin')]);
+  if (loading !== name) return;
+  main = meta0;
+  gtLayers.gt = pointsLayer(pbuf, main.points, 0.02);
+  Object.assign(gtLayers, voxelLayers(vbuf, main.voxels, main.lo, main.res));
+  const box = new THREE.Box3().setFromBufferAttribute(gtLayers.gt.geometry.attributes.position);
+  zRange = [box.min.z, box.max.z];
+  const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+  controls.target.copy(c);
+  camera.position.set(c.x + 0.2 * s.x, c.y - 1.2 * s.y, c.z + 1.4 * Math.max(s.x, s.y));
+  scene.add(gtLayers.gt);
+  const views = {};
+  await Promise.all(SETTINGS.slice(1).map(async st => {
+    const r = await fetch(base + `views_${st}/scene.json`);
+    if (r.ok) views[st] = await r.json();
+  }));
+  main.views = views;
+  $('settings').innerHTML = '';
+  SETTINGS.forEach((st, i) => {
+    const sq = st === '3d' ? main.sqs.kmeans_full : views[st]?.sqs;
+    const b = document.createElement('button');
+    b.dataset.s = st;
+    b.disabled = !sq;
+    b.innerHTML = `${i + 1} ${TITLE[st]}<small>${sq ? `${sq.count} SQs` + (sq.iou ? ` · ${st.startsWith('scene_') ? 'scene IoU' : 'mean instance IoU'} ${sq.iou.toFixed(3)}` : '') : 'not fitted'}</small>`;
+    b.onclick = () => setSetting(st);
+    $('settings').appendChild(b);
+  });
+  await setSetting(setting && (setting === '3d' || views[setting]) ? setting : '3d');
+}
+
+async function setSetting(st) {
+  leaveLook();
+  setting = st;
+  selected = null;
+  const current = main, dirBase = base, next = {};  // built aside, shown only if still current
+  $('viewPanel').style.display = 'none';
+  let m = null;
+  if (st === '3d') {
+    next.sq = await sqMesh(dirBase + 'kmeans_full.bin', current.sqs.kmeans_full.mesh);
+  } else {
+    m = current.views[st];
+    const dir = dirBase + `views_${st}/`;
+    const [pbuf, vbuf] = await Promise.all([bin(dir + 'points.bin'), bin(dir + 'voxels.bin')]);
+    next.sq = await sqMesh(dir + 'sqs.bin', m.sqs.mesh);
+    next.pts = pointsLayer(pbuf, m.points, 0.015);
+    Object.assign(next, voxelLayers(vbuf, m.voxels, m.lo, m.res));
+    next.cams = cameraLayer(m.c2w);
+  }
+  if (main !== current || setting !== st) { clearLayers(next); return; }  // a newer scene or input was selected meanwhile
+  clearLayers(layers);
+  layers = next;
+  meta = m;
+  for (const k in layers) scene.add(layers[k]);
+  document.querySelectorAll('#settings button').forEach(b => b.classList.toggle('on', b.dataset.s === st));
+  const sq = st === '3d' ? main.sqs.kmeans_full : meta.sqs;
+  $('status').textContent = st === '3d' ? 'k-means + SuperFlex loss on the 3D GT'
+    : `${meta.frames.length} views, ${meta.points.toLocaleString()} input points, ${st.startsWith('scene_') ? 'no instance labels' : sq.instances + ' instances seen'}`;
+  update();
+}
+
+function update() {
+  const st3d = setting === '3d';
+  if (layers.sq) { layers.sq.visible = $('showSq').checked; layers.sq.material.opacity = +$('opacity').value;
+                   layers.sq.material.depthWrite = +$('opacity').value > 0.99; }
+  for (const p of [layers.pts, gtLayers.gt]) if (p) {
+    const u = p.userData, a = p.geometry.attributes.color;
+    a.array.set($('instColor').checked ? u.instF : u.rgbF); a.needsUpdate = true;
+  }
+  if (layers.pts) layers.pts.visible = $('showPts').checked;
+  gtLayers.gt.visible = $('showGt').checked || (st3d && $('showPts').checked);
+  // solid / never-seen voxels: carved from the views, or the GT grid for the reference
+  gtLayers.vox.visible = st3d && $('showVox').checked;
+  gtLayers.unk.visible = st3d && $('showUnk').checked;
+  if (layers.vox) layers.vox.visible = $('showVox').checked;
+  if (layers.unk) layers.unk.visible = $('showUnk').checked;
+  if (layers.cams) layers.cams.visible = $('showCams').checked && !look;
+  clip.constant = look ? 100 : zRange[0] + $('cut').value * (zRange[1] - zRange[0]) + 1e-3;
+}
+
+// selecting a camera: its image (or labels) in the side panel
+function selectView(i) {
+  selected = i;
+  scene.remove(layers.cams);
+  layers.cams = cameraLayer(meta.c2w);
+  scene.add(layers.cams);
+  $('viewPanel').style.display = 'block';
+  $('viewTitle').textContent = `frame ${meta.frames[i]}`;
+  showImage();
+  update();
+}
+
+function imageUrl() { return base + `views_${setting}/img/${meta.frames[selected]}` + ($('showLabel').checked ? '_label.png' : '.jpg'); }
+function showImage() {
+  $('viewImg').src = imageUrl();
+  if (look) look.plane.material.map = new THREE.TextureLoader().load(imageUrl(), t => { t.colorSpace = THREE.SRGBColorSpace; });
+}
+
+// looking through the selected camera: same pose and field of view, the image on a plane in front of it
+function lookThrough() {
+  if (selected === null || look) return;
+  const T = meta.c2w[selected], K = meta.camera;
+  look = { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov, target: controls.target.clone() };
+  controls.enabled = false;
+  const col = j => new THREE.Vector3(T[0][j], T[1][j], T[2][j]);
+  // OpenCV (x right, y down, z forward) -> three.js camera (x right, y up, looking along -z)
+  camera.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(col(0), col(1).negate(), col(2).negate()));
+  camera.position.set(T[0][3], T[1][3], T[2][3]);
+  camera.fov = 2 * Math.atan(K.h / 2 / K.fy) * 180 / Math.PI;
+  camera.updateProjectionMatrix();
+  const d = 1, h = K.h / K.fy * d, w = K.w / K.fx * d;
+  const tex = new THREE.TextureLoader().load(imageUrl(), t => { t.colorSpace = THREE.SRGBColorSpace; });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, opacity: +$('overlay').value, depthTest: false, depthWrite: false }));
+  plane.position.set((K.w / 2 - K.cx) / K.fx * d, -(K.h / 2 - K.cy) / K.fy * d, -d);  // principal point offset
+  plane.renderOrder = 999;
+  camera.add(plane);
+  look.plane = plane;
+  update();
+}
+
+function leaveLook() {
+  if (!look) return;
+  camera.remove(look.plane);
+  camera.position.copy(look.pos); camera.quaternion.copy(look.quat); camera.fov = look.fov;
+  camera.updateProjectionMatrix();
+  controls.target.copy(look.target);
+  controls.enabled = true;
+  look = null;
+  update();
+}
+
+const ray = new THREE.Raycaster(), down = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', e => down.set(e.clientX, e.clientY));
+renderer.domElement.addEventListener('click', e => {
+  if (look || !layers.cams?.visible || down.distanceTo(new THREE.Vector2(e.clientX, e.clientY)) > 4) return;
+  ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1), camera);
+  const hit = ray.intersectObject(layers.cams.userData.blobs)[0];
+  if (hit) selectView(hit.instanceId);
+});
+
+['showSq', 'showPts', 'showGt', 'showVox', 'showUnk', 'showCams', 'instColor', 'opacity', 'cut'].forEach(id => $(id).addEventListener('input', update));
+$('showLabel').addEventListener('input', showImage);
+$('overlay').addEventListener('input', () => { if (look) look.plane.material.opacity = +$('overlay').value; });
+$('lookBtn').addEventListener('click', lookThrough);
+$('scene').addEventListener('change', e => loadScene(e.target.value));
+addEventListener('keydown', e => {
+  const i = '1234567'.indexOf(e.key);
+  if (i >= 0 && (SETTINGS[i] === '3d' || main.views[SETTINGS[i]])) setSetting(SETTINGS[i]);
+  if (e.key === 'c' || e.key === 'C') {
+    if (selected === null && meta && setting !== '3d' && meta.frames.length === 1) selectView(0);
+    lookThrough();
+  }
+  if (e.key === 'Escape') leaveLook();
+});
+
+const scenes = await fetch('data/index.json').then(r => r.json());
+$('scene').innerHTML = scenes.map(s => `<option>${s}</option>`).join('');
+loadScene(scenes.includes('room_0_4cm') ? 'room_0_4cm' : scenes[0]);
+</script>
+</body>
+</html>

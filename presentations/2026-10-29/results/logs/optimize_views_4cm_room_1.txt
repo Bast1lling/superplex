@@ -1,0 +1,2 @@
+room_1 views_multi: 116 SQs for 51 instances, mean IoU 0.564 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/views_multi.npz
+room_1 views_f800: 76 SQs for 25 instances, mean IoU 0.295 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/views_f800.npz

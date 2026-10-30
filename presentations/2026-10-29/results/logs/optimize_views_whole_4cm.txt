@@ -1,0 +1,6 @@
+room_0 views_scene_multi: 80 SQs (count 80), scene IoU 0.724 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/views_scene_multi.npz
+room_0 views_scene_rgb_multi: 67 SQs (count 67), scene IoU 0.543 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/views_scene_rgb_multi.npz
+room_1 views_scene_multi: 34 SQs (count 34), scene IoU 0.925 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/views_scene_multi.npz
+room_1 views_scene_rgb_multi: 58 SQs (count 58), scene IoU 0.746 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/views_scene_rgb_multi.npz
+office_0 views_scene_multi: 46 SQs (count 46), scene IoU 0.719 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/views_scene_multi.npz
+office_0 views_scene_rgb_multi: 42 SQs (count 42), scene IoU 0.472 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/views_scene_rgb_multi.npz

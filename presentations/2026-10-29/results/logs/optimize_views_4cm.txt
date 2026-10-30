@@ -1,0 +1,12 @@
+room_0 views_multi: 232 SQs for 78 instances, mean IoU 0.539 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/views_multi.npz
+room_0 views_f800: 144 SQs for 45 instances, mean IoU 0.390 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/views_f800.npz
+room_0 views_rgb_multi: 239 SQs for 78 instances, mean IoU 0.447 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/views_rgb_multi.npz
+room_0 views_rgb_f800: 144 SQs for 45 instances, mean IoU 0.231 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/views_rgb_f800.npz
+room_1 views_multi: 116 SQs for 51 instances, mean IoU 0.564 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/views_multi.npz
+room_1 views_f800: 76 SQs for 25 instances, mean IoU 0.296 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/views_f800.npz
+room_1 views_rgb_multi: 166 SQs for 51 instances, mean IoU 0.408 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/views_rgb_multi.npz
+room_1 views_rgb_f800: 70 SQs for 25 instances, mean IoU 0.122 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_1/views_rgb_f800.npz
+office_0 views_multi: 128 SQs for 37 instances, mean IoU 0.542 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/views_multi.npz
+office_0 views_f800: 82 SQs for 23 instances, mean IoU 0.380 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/views_f800.npz
+office_0 views_rgb_multi: 149 SQs for 37 instances, mean IoU 0.409 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/views_rgb_multi.npz
+office_0 views_rgb_f800: 97 SQs for 23 instances, mean IoU 0.268 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/views_rgb_f800.npz

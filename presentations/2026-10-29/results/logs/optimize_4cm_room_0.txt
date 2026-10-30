@@ -1,0 +1,6 @@
+room_0 kmeans_surface: 239 SQs, mean IoU 0.339 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/kmeans_surface.npz
+room_0 kmeans_volume: 239 SQs, mean IoU 0.762 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/kmeans_volume.npz
+room_0 kmeans_full: 239 SQs, mean IoU 0.748 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/kmeans_full.npz
+room_0 kmeans_full_deform: 239 SQs, mean IoU 0.765 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/kmeans_full_deform.npz
+room_0 dbscan_full: 234 SQs, mean IoU 0.707 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/dbscan_full.npz
+room_0 dbscan_full: 230 SQs, mean IoU 0.719 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/room_0/dbscan_full.npz

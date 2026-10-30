@@ -1,0 +1,2 @@
+office_0 views_multi: 128 SQs for 37 instances, mean IoU 0.542 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/views_multi.npz
+office_0 views_f800: 82 SQs for 23 instances, mean IoU 0.386 -> /home/sebastian/Documents/Uni/Thesis/code/superplex-presentation/presentations/2026-10-29/results/4cm/office_0/views_f800.npz
