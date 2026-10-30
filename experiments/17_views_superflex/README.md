@@ -9,7 +9,7 @@ nearest solid instance, objective unchanged. Single view: unknown query points l
 term dropped. Init: SuperFlex robust on the partial points (single view RGBD also k-means with the network's count).
 Evaluation as in 16; the old 12–15 fits are re-evaluated the same way (`--baseline`).
 
-**Status: running** (`run_all.sh`). First results (room_0): old fits re-evaluated 0.634 (12 RGBD multi, was 0.630),
+**Status: stopped** (for the presentation runs; `run_all.sh` resumes, skipping finished runs). Done: all old 12–15 fits re-evaluated (`results/runs/baseline_*`). First results (room_0): old fits re-evaluated 0.634 (12 RGBD multi, was 0.630),
 0.709 (3D upper bound, was 0.708); RGBD single view frame 800: 0.550 (old 0.55), precision 0.90, recall 0.60.
 
     cd code && uv run python fitviews.py --setting rgbd_multi --scene room_0 [--frame 800 --init kmeans_net]
