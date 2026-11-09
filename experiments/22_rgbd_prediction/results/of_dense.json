@@ -1,0 +1,58 @@
+{
+ "args": {
+  "name": "of_dense",
+  "epochs": 375,
+  "batch": 8,
+  "lr": 0.0001,
+  "queries": 200,
+  "eval_every": 75,
+  "patch_queries": false,
+  "loss": "cd",
+  "mask": "instance",
+  "two_stage": false,
+  "select": 300,
+  "dense": true,
+  "layers": 1,
+  "frames": null,
+  "overfit": "room_2_000500"
+ },
+ "test": {
+  "targets": 112.0,
+  "visible": 68.0,
+  "recall@0.5": 0.014705882407724857,
+  "best_iou": 0.01779746077954769,
+  "exist_precision": 0.9946014881134033,
+  "exist_recall": 1.0,
+  "predicted": 3149.0,
+  "occ_iou_topk": 0.10952381044626236,
+  "occ_iou": 0.1214771643280983,
+  "cls_acc": 0.9964878559112549
+ },
+ "train_eval": {
+  "targets": 112.0,
+  "visible": 68.0,
+  "recall@0.5": 0.014705882407724857,
+  "best_iou": 0.01779746077954769,
+  "exist_precision": 0.9946014881134033,
+  "exist_recall": 1.0,
+  "predicted": 3149.0,
+  "occ_iou_topk": 0.10952381044626236,
+  "occ_iou": 0.1214771643280983,
+  "cls_acc": 0.9964878559112549
+ },
+ "per_frame": [
+  {
+   "name": "room_2_000500",
+   "targets": 112,
+   "visible": 68,
+   "recall@0.5": 0.014705882407724857,
+   "best_iou": 0.01779746077954769,
+   "exist_precision": 0.9946014881134033,
+   "exist_recall": 1.0,
+   "predicted": 3149,
+   "occ_iou_topk": 0.10952381044626236,
+   "occ_iou": 0.1214771643280983,
+   "cls_acc": 0.9964878559112549
+  }
+ ]
+}

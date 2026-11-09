@@ -1,0 +1,13 @@
+--name f16_v1 --views 1 --setting f16 --steps 3000
+--name f16_v2 --views 2 --setting f16 --steps 3000
+--name f16_v2_render --views 2 --setting f16 --steps 3000 --render
+--name f16_v2_cube --views 2 --setting f16 --steps 3000 --sampling cube
+--name f16_v2_frustum --views 2 --setting f16 --steps 3000 --targets frustum
+--name f16_v1_render --views 1 --setting f16 --steps 3000 --render
+--name f16_v2_frustum --views 2 --setting f16 --steps 3000 --targets frustum
+--name f16_fusion --fusion f16_v1 --setting f16
+--name frames_v1 --views 1 --setting frames --steps 4000
+--name frames_v2 --views 2 --setting frames --steps 4000
+--name frames_fusion --fusion frames_v1 --setting frames
+--name frames_v2_cube --views 2 --setting frames --steps 4000 --sampling cube
+--name frames_v1_cube --views 1 --setting frames --steps 4000 --sampling cube

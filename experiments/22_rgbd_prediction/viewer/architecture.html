@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RGBD Predictor Pipeline</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --fg: #1d2127; --muted: #5f6873; --line: #dfe2e6; --accent: #2f6fd6;
+    --img: #e2ecfb; --img-s: #2f6fd6; --geo: #e3f4e8; --geo-s: #2e8b57; --tok: #f6ecdd; --tok-s: #b7791f;
+    --dec: #efe7f8; --dec-s: #7b4fc4; --head: #fbe5e5; --head-s: #c2413b; --frozen: #eceff2; --frozen-s: #7a828c;
+    --warn: #fff4d6; --warn-s: #b88a00; --code: #f0f1f3;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff;
+    --img: #1b2a44; --img-s: #6aa8ff; --geo: #17322a; --geo-s: #5cc78d; --tok: #3a2e1b; --tok-s: #e0a64a;
+    --dec: #2c2340; --dec-s: #ae8cf0; --head: #3d2023; --head-s: #f07b74; --frozen: #262b33; --frozen-s: #9aa3ad;
+    --warn: #3a3218; --warn-s: #e3c04f; --code: #262b33;
+  } }
+  :root[data-theme="dark"] {
+    --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff;
+    --img: #1b2a44; --img-s: #6aa8ff; --geo: #17322a; --geo-s: #5cc78d; --tok: #3a2e1b; --tok-s: #e0a64a;
+    --dec: #2c2340; --dec-s: #ae8cf0; --head: #3d2023; --head-s: #f07b74; --frozen: #262b33; --frozen-s: #9aa3ad;
+    --warn: #3a3218; --warn-s: #e3c04f; --code: #262b33;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+  nav { position: sticky; top: 16px; align-self: start; font-size: 13px; }
+  nav a { display: block; color: var(--muted); text-decoration: none; padding: 3px 0 3px 10px; border-left: 2px solid var(--line); }
+  nav a:hover { color: var(--accent); border-color: var(--accent); }
+  nav .t { font-weight: 600; color: var(--fg); margin-bottom: 8px; }
+  main { min-width: 0; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 44px 0 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 22px 0 6px; }
+  p, li { max-width: 78ch; }
+  .sub { color: var(--muted); margin: 0 0 18px; }
+  code, .m { font: 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  pre { font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .tbl { overflow-x: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 12px 0; }
+  .warn { background: var(--warn); border-left: 4px solid var(--warn-s); border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 14px 0; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  .kpi .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--muted); font-size: 12px; }
+  .tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 10px; border: 1px solid; margin-left: 6px; vertical-align: 2px; }
+  .tag.frozen { color: var(--frozen-s); border-color: var(--frozen-s); }
+  .tag.train { color: var(--geo-s); border-color: var(--geo-s); }
+  .tag.new { color: var(--dec-s); border-color: var(--dec-s); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { fill: var(--fg); font: 12px system-ui, sans-serif; }
+  svg .mut { fill: var(--muted); font-size: 11px; }
+  svg .b { font-weight: 600; }
+  .suspect { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; }
+  .suspect h3 { margin: 0 0 4px; }
+  .suspect .ev { color: var(--muted); font-size: 14px; }
+  .rank { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px;
+          background: var(--head-s); color: #fff; font-size: 12px; font-weight: 700; margin-right: 8px; }
+  .rank.m { background: var(--warn-s); } .rank.l { background: var(--frozen-s); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px;
+                         background: var(--c); border: 1px solid var(--s); }
+  @media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); } nav { display: none; } }
+
+  /* comments */
+  ::highlight(cmt) { background: color-mix(in srgb, var(--warn-s) 35%, transparent); }
+  ::highlight(cmt-active) { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+  #cToggle { position: fixed; top: 14px; right: 16px; z-index: 30; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+             border-radius: 18px; padding: 6px 14px; font: 600 13px system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  #cPanel { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100vw); z-index: 25; background: var(--panel);
+            border-left: 1px solid var(--line); padding: 58px 16px 24px; overflow-y: auto; transform: translateX(100%); transition: transform .2s; }
+  #cPanel.open { transform: none; box-shadow: -4px 0 18px rgba(0,0,0,.08); }
+  body.cOpen .wrap { margin-right: min(400px, 100vw); }
+  #cPanel .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  #cPanel .filters { display: flex; gap: 12px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .thread { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 14px; background: var(--bg); }
+  .thread.resolved { opacity: .55; }
+  .thread .sec { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
+  .thread .q { border-left: 3px solid var(--warn-s); padding-left: 8px; color: var(--muted); font-size: 13px; margin: 4px 0 6px; cursor: pointer;
+               max-height: 4.5em; overflow: hidden; }
+  .msg { margin: 6px 0; white-space: pre-wrap; }
+  .msg .who { font-weight: 650; font-size: 12px; } .msg .who.claude { color: var(--dec-s); }
+  .msg .when { color: var(--muted); font-size: 11px; margin-left: 6px; }
+  .thread .acts { display: flex; gap: 10px; margin-top: 6px; font-size: 12px; }
+  .thread .acts button, .cBtn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
+  textarea.cIn { width: 100%; min-height: 64px; margin-top: 6px; font: 14px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--panel);
+                 border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; resize: vertical; }
+  .cRow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .cRow button { border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 13px; }
+  .cRow button.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #cPop { position: absolute; z-index: 40; display: none; background: var(--accent); color: #fff; border: none; border-radius: 14px; padding: 4px 12px;
+          font: 600 12px system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  h2 .addc { font-size: 12px; font-weight: 500; margin-left: 10px; opacity: 0; color: var(--accent); cursor: pointer; }
+  h2:hover .addc { opacity: 1; }
+  .ccount { display: inline-block; font-size: 11px; font-weight: 600; background: var(--warn-s); color: #fff; border-radius: 9px; padding: 0 6px;
+            margin-left: 8px; vertical-align: 3px; cursor: pointer; }
+  #cOffline { display: none; background: var(--warn); border-left: 4px solid var(--warn-s); padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+  .mut { color: var(--muted); }
+  .card ul ul { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="t">Contents</div>
+  <a href="#overview">Pipeline</a>
+  <a href="#data">1 · Data</a>
+  <a href="#targets">2 · Target SQs</a>
+  <a href="#cache">3 · Per-frame cache</a>
+  <a href="#model">4 · Model</a>
+  <a href="#sampling">5 · Surface sampling</a>
+  <a href="#losses">6 · Losses</a>
+  <a href="#training">7 · Training</a>
+  <a href="#eval">8 · Evaluation</a>
+  <a href="#tools">9 · Tools &amp; viewers</a>
+  <a href="#state">Current numbers</a>
+  <a href="#removed">Removed</a>
+</nav>
+<main>
+<h1>Single-frame SQ predictor (exp 22)</h1>
+<p class="sub">One RGB-D frame → the plain superquadrics of the visible scene parts, in the camera frame, each with existence,
+class and instance mask. This page describes only the current pipeline, as of 2026-11-07. Defaults are given first;
+<code>--flags</code> name the live alternatives.</p>
+
+<h2 id="overview">Pipeline</h2>
+<svg viewBox="0 0 1000 520" role="img" aria-label="Pipeline: offline targets and cache, model, losses">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <g stroke-width="1.5">
+    <text x="10" y="22" class="b">Offline, once</text>
+    <rect x="10" y="34" width="210" height="70" rx="8" fill="var(--frozen)" stroke="var(--frozen-s)"/>
+    <text x="115" y="58" text-anchor="middle" class="b">1 · Replica, 8 scenes</text>
+    <text x="115" y="76" text-anchor="middle" class="mut">NICE-SLAM trajectories: RGB, depth,</text>
+    <text x="115" y="92" text-anchor="middle" class="mut">GT instance per pixel</text>
+    <rect x="250" y="34" width="230" height="70" rx="8" fill="var(--geo)" stroke="var(--geo-s)"/>
+    <text x="365" y="58" text-anchor="middle" class="b">2 · Target SQs per instance</text>
+    <text x="365" y="76" text-anchor="middle" class="mut">SuperFlex robust + 1000 TTO steps</text>
+    <text x="365" y="92" text-anchor="middle" class="mut">plain SQs, world frame</text>
+    <rect x="510" y="34" width="480" height="70" rx="8" fill="var(--tok)" stroke="var(--tok-s)"/>
+    <text x="750" y="58" text-anchor="middle" class="b">3 · Per-frame cache (every 10th frame, 1600)</text>
+    <text x="750" y="76" text-anchor="middle" class="mut">DINOv3 tokens · /4 view · targets in the camera frustum ·</text>
+    <text x="750" y="92" text-anchor="middle" class="mut">pixel owner · visible targets · patch owners · heatmap · f</text>
+    <path d="M220 69H248" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M480 69H508" stroke="var(--muted)" marker-end="url(#ar)"/>
+
+    <text x="10" y="146" class="b">4 · Model (per frame, 1.15 M trainable)</text>
+    <rect x="10" y="158" width="160" height="64" rx="8" fill="var(--img)" stroke="var(--img-s)" stroke-dasharray="5 3"/>
+    <text x="90" y="182" text-anchor="middle" class="b">DINOv3 ViT-L/16</text>
+    <text x="90" y="200" text-anchor="middle" class="mut">frozen, cached</text>
+    <text x="90" y="214" text-anchor="middle" class="mut">42 × 75 × 1024</text>
+    <rect x="10" y="236" width="160" height="50" rx="8" fill="var(--frozen)" stroke="var(--frozen-s)"/>
+    <text x="90" y="258" text-anchor="middle" class="b">depth 168 × 300</text>
+    <text x="90" y="274" text-anchor="middle" class="mut">→ patch centroid (anchor)</text>
+    <rect x="200" y="158" width="170" height="128" rx="8" fill="var(--tok)" stroke="var(--tok-s)"/>
+    <text x="285" y="182" text-anchor="middle" class="b">4a · Input projection</text>
+    <text x="214" y="206">LN → Lin → 256 → GELU</text>
+    <text x="214" y="224">→ 128</text>
+    <text x="214" y="246">+ Lin(Fourier(anchor))</text>
+    <text x="214" y="274" class="mut">3150 tokens × 128</text>
+    <rect x="400" y="158" width="150" height="128" rx="8" fill="var(--dec)" stroke="var(--dec-s)"/>
+    <text x="475" y="182" text-anchor="middle" class="b">4b · Encoder</text>
+    <text x="414" y="206">1 pre-norm layer</text>
+    <text x="414" y="224">self-attention</text>
+    <text x="414" y="242">8 heads · FFN 512</text>
+    <rect x="580" y="158" width="170" height="128" rx="8" fill="var(--head)" stroke="var(--head-s)"/>
+    <text x="665" y="182" text-anchor="middle" class="b">4c · Proposal heads</text>
+    <text x="594" y="206">one SQ per patch:</text>
+    <text x="594" y="224">trans = anchor + Δ</text>
+    <text x="594" y="242">existence, class, mask</text>
+    <text x="594" y="274" class="mut">3150 proposals</text>
+    <rect x="780" y="158" width="210" height="128" rx="8" fill="var(--dec)" stroke="var(--dec-s)"/>
+    <text x="885" y="182" text-anchor="middle" class="b">4d · Selection</text>
+    <text x="794" y="206">3 × 3 local maxima of</text>
+    <text x="794" y="224">the existence map,</text>
+    <text x="794" y="242">top K = 300 (no gradient)</text>
+    <path d="M170 190H198" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M170 261H198" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M370 222H398" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M550 222H578" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M750 222H778" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <rect x="610" y="310" width="380" height="80" rx="8" fill="var(--dec)" stroke="var(--dec-s)"/>
+    <text x="800" y="334" text-anchor="middle" class="b">4e · Decoder, 1 layer → 4f · refine heads → 300 SQs</text>
+    <text x="622" y="356">query = proposal's encoder token, reference = its SQ</text>
+    <text x="622" y="374">self-attn over 300 · cross-attn to 3150 · FFN · refine</text>
+    <path d="M885 286V308" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M475 286V350H608" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+    <text x="486" y="344" class="mut">memory</text>
+
+    <text x="10" y="426" class="b">6 · Losses</text>
+    <rect x="10" y="438" width="300" height="72" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+    <text x="24" y="460" class="b">Proposal loss · one-to-many</text>
+    <text x="24" y="478" class="mut">patch → the visible SQ owning it:</text>
+    <text x="24" y="496" class="mut">heatmap focal, Chamfer, class, mask</text>
+    <rect x="330" y="438" width="320" height="72" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+    <text x="344" y="460" class="b">Decoder loss · Hungarian, one-to-one</text>
+    <text x="344" y="478" class="mut">300 SQs ↔ the visible targets:</text>
+    <text x="344" y="496" class="mut">existence focal, Chamfer, class, mask</text>
+    <rect x="670" y="438" width="320" height="72" rx="8" fill="var(--panel)" stroke="var(--line)" stroke-dasharray="5 3"/>
+    <text x="684" y="460" class="b">Projection loss · optional</text>
+    <text x="684" y="478" class="mut">render the 300 SQs from the camera:</text>
+    <text x="684" y="496" class="mut">GT instance, class, depth per ray</text>
+    <path d="M592 286V420H160V436" stroke="var(--muted)" fill="none" stroke-dasharray="3 3" marker-end="url(#ar)"/>
+    <path d="M700 390V410H490V436" stroke="var(--muted)" fill="none" stroke-dasharray="3 3" marker-end="url(#ar)"/>
+    <path d="M830 390V436" stroke="var(--muted)" fill="none" stroke-dasharray="3 3" marker-end="url(#ar)"/>
+    <path d="M990 104V130H520V150" stroke="var(--tok-s)" fill="none" stroke-dasharray="2 4"/>
+    <text x="760" y="124" class="mut">targets, owners, heatmap, f → losses</text>
+  </g>
+</svg>
+<div class="legend">
+  <span style="--c:var(--frozen);--s:var(--frozen-s)">data</span>
+  <span style="--c:var(--geo);--s:var(--geo-s)">target fitting</span>
+  <span style="--c:var(--tok);--s:var(--tok-s)">cache / projection</span>
+  <span style="--c:var(--img);--s:var(--img-s)">frozen backbone</span>
+  <span style="--c:var(--dec);--s:var(--dec-s)">transformer</span>
+  <span style="--c:var(--head);--s:var(--head-s)">prediction heads</span>
+</div>
+
+<h2 id="data">1 · Data</h2>
+<div class="card">
+<ul>
+  <li><b>Replica, the 8 NICE-SLAM scenes.</b> Rendered trajectories give RGB, depth and the GT instance per pixel;
+    there are 51 classes. Every 10th frame is used, 200 per scene.</li>
+  <li><b>Split.</b> 7 training scenes (room_1, room_2, office_0–4; 1400 frames), test on room_0 (200 frames).
+    <code>--frames 16 --train_scenes 1</code> overfits on 16 frames (train = eval).</li>
+  <li><b>View.</b> Rows 4..676 of the 1200 × 680 image. DINO sees 1200 × 672 (42 × 75 patches of 16 px); depth and labels
+    are kept at /4 = 168 × 300 (4 × 4 pixels per patch). Pinhole f = 150, camera frame x right, y down, z forward.</li>
+</ul>
+<p class="mut">Files: <code>../12_rgbd_multiview</code> (views, GT grid) · data in <code>Thesis/data/replica_rgbd_frames</code></p>
+</div>
+
+<h2 id="targets">2 · Target SQs</h2>
+<div class="card">
+<ul>
+  <li><b>Per GT instance</b>, independently, as in experiment 16 (<code>--plain</code>): SuperFlex robust as the
+    initialization (tapering and bending off), then 1000 Adam steps of SuperFlex's objective, keeping the best state.</li>
+  <li><b>Occupancy</b> of the query points: winding number of the instance's own oriented points (<code>occupancy.py</code>).
+    This closes objects without turning the space behind walls into wall.</li>
+  <li><b>Result.</b> 1216 SQs in the 7 training scenes and 250 in room_0, in the world frame
+    (<code>results/targets_winding/&lt;scene&gt;/sqs.npz</code>).</li>
+</ul>
+<div class="warn">The decomposition is not consistent across scenes: a floor gets 1–5 SQs, a door 1–5, and a chair has
+2.0–9.6 SQs on average depending on the scene. A model cannot learn that as a rule; this is task 3, choosing targets.</div>
+<p class="mut">Files: <code>code/fit_targets.py</code>, <code>code/occupancy.py</code></p>
+</div>
+
+<h2 id="cache">3 · Per-frame cache</h2>
+<div class="card">
+<p><code>cache_frames.py</code> → <code>&lt;frame&gt;_dino.npy</code>, <code>_view.npz</code>:</p>
+<ul>
+  <li>DINOv3 ViT-L/16 last-layer patch tokens (42 × 75 × 1024, fp16, frozen).</li>
+  <li>RGB, depth and GT instance label at 168 × 300.</li>
+  <li>Every target SQ that intersects the camera frustum, transformed into the camera frame (≈ 65 per frame).</li>
+</ul>
+<p><code>cache_assign.py</code> → <code>&lt;frame&gt;_assign.npz</code> (rebuilt 2026-11-07):</p>
+<ul>
+  <li><b>Pixel owner</b> (<code>train.pixel_owner</code>). Among the SQs of the pixel's GT instance, the first one its ray
+    enters (hard ray casting, <code>render.entry_depths</code>). If the ray misses them all, the one with the smallest
+    |SDF|. The owner's entry depth is stored too (<code>ownz</code>).</li>
+  <li><b>Visible targets.</b> SQs owning ≥ 1 pixel, ≈ 44 per frame. Only these are training targets.</li>
+  <li><b>Patch owner.</b> The SQ owning ≥ 50 % of a patch's pixels, else negative. Every visible SQ without such a patch
+    gets the patch where its share is largest.</li>
+  <li><b>Heatmap</b> (CenterNet). One Gaussian per SQ over its own patches, peaking at its innermost patch,
+    σ = max(0.5, √patches / 4).</li>
+  <li><b>f</b> = visible / camera-facing surface area of each target (<code>train.visible_fraction</code>), for both samplings
+    (<code>f</code>, <code>f_cube</code>). A surface sample is visible if all of these hold:
+    <ul>
+      <li>it lies in the image and faces the camera;</li>
+      <li>it is not behind the observed depth by more than 3 cm, unless its pixel is its own;</li>
+      <li>it is not behind its pixel owner's surface (another SQ) by more than 5 mm;</li>
+      <li>it is not inside another SQ of its instance.</li>
+    </ul>
+    Mean f of the visible targets is 0.47; 56 % have f &lt; 0.5. f is used only in metrics so far.</li>
+</ul>
+</div>
+
+<h2 id="model">4 · Model <span class="tag train">model.TopKModel · d = 128 · 1.15 M</span></h2>
+<div class="tbl"><table>
+<tr><th>Component</th><th>What it does</th><th class="n">Params</th></tr>
+<tr><td><b>4a</b> Input projection</td><td>Per patch: LN([DINO 1024 ‖ Sonata 1088, zeroed]) → Lin 256 → GELU → Lin 128, plus a
+  linear map of the Fourier encoding (8 frequencies) of the <i>anchor</i>. The anchor is the patch's 3D centroid from depth,
+  or 3 m along the ray if the patch has no depth. Because of the zeroed Sonata slot, ≈ 280 k of these parameters are dead
+  under <code>--inputs dino</code>.</td><td class="n">584 k</td></tr>
+<tr><td><b>4b</b> Encoder</td><td>1 pre-norm transformer layer (<code>--layers</code>) over the 3150 tokens: 8 heads, FFN 512, GELU,
+  final LayerNorm.</td><td class="n">199 k</td></tr>
+<tr><td><b>4c</b> Proposal heads</td><td>One SQ per patch:
+  <ul>
+    <li>scale = softplus + 5 mm (init 0.2 m), exponents 0.1 + 1.8 σ, quaternion rotation, translation = anchor + Δ;</li>
+    <li>existence σ (heatmap), class logits (51);</li>
+    <li>instance mask over the 42 × 75 patches = MLP(q) · Lin(token).</li>
+  </ul></td><td class="n">58 k</td></tr>
+<tr><td><b>4d</b> Selection</td><td>The K = 300 (<code>--select</code>) highest 3 × 3 local maxima of the existence map, without
+  gradient.</td><td class="n">–</td></tr>
+<tr><td><b>4e</b> Decoder</td><td>1 pre-norm decoder layer (<code>--dec_layers</code>). The query is the proposal's encoder token
+  (gradients reach the encoder) plus the Fourier encoding of the reference translation. Self-attention over the 300,
+  cross-attention to all 3150 tokens, FFN 512.</td><td class="n">271 k</td></tr>
+<tr><td><b>4f</b> Refine heads</td><td>Refine the proposal SQ (the reference, detached): scale = ref · exp(Δ), exponents =
+  0.1 + 1.8 σ(logit(ref) + Δ), translation = ref + Δ, all Δ starting at 0. Rotation, existence, class and mask are predicted
+  anew. The output is 300 SQs.</td><td class="n">41 k</td></tr>
+</table></div>
+
+<h2 id="sampling">5 · Surface sampling <span class="tag new">--sampling grid | cube</span></h2>
+<div class="card">
+<p>The surface points used by the Chamfer losses, the matching cost, the volumetric loss and the visibility
+(<code>train.surface</code>):</p>
+<ul>
+  <li><b>grid</b> (default): a regular (η, ω) grid, n × n, as in SuperFlex. For boxy SQs the samples crowd onto edges and
+    corners, and the inside of both pole faces gets no samples. Example: room_1 frame 130, wall SQ 0 has a point 146 cm
+    from the nearest sample.</li>
+  <li><b>cube</b>: a cube grid of 6 m² points (m = round(n / √6)), projected radially onto the SQ by
+    s ⊙ u · F(u)<sup>−ε1/2</sup>. On box faces it is nearly uniform, its normals are analytic and it is differentiable in
+    scale and shape. Same wall: 28 cm.</li>
+</ul>
+<p>Sample counts: 16 × 16 for the losses, 8 × 8 for proposals, 4 × 4 in the matching cost. Metrics always use the grid,
+so they stay comparable with earlier runs.</p>
+</div>
+
+<h2 id="losses">6 · Losses</h2>
+<p>L = L<sub>proposals</sub> + L<sub>decoder</sub> (+ the projection terms). Both main terms only see the <b>visible</b>
+targets (§ 3).</p>
+<div class="tbl"><table>
+<tr><th>Term</th><th>Proposal loss (one-to-many, <code>dense.losses</code>)</th><th>Decoder loss (Hungarian, <code>train.losses</code>)</th></tr>
+<tr><td>Pairing</td><td>Each patch → its patch owner (§ 3). Up to 512 positive patches per frame, drawn ∝ 1 / (patches of their
+  SQ).</td><td>Hungarian matching of the 300 SQs to the visible targets. Cost = 10 · Chamfer (4 × 4) + 2 · (1 − p<sub>class</sub>)
+  + (1 − existence).</td></tr>
+<tr><td>Existence</td><td>2 · CenterNet focal loss against the heatmap</td><td>2 · sigmoid focal loss (α 0.25, γ 2), matched = 1,
+  normalized by the number of targets</td></tr>
+<tr><td>Geometry</td><td>10 · Chamfer + 10 · forced Chamfer (8 × 8)</td><td>10 · Chamfer + 10 · forced Chamfer (16 × 16);
+  <code>--w_dec_cd</code> scales both</td></tr>
+<tr><td>Class</td><td colspan="2">2 · cross-entropy</td></tr>
+<tr><td>Mask</td><td colspan="2">5 · BCE + 5 · Dice of the instance mask, against the share of the GT instance's pixels per patch</td></tr>
+</table></div>
+<p><b>Forced Chamfer</b>: the predicted SQ placed at the target's translation, as in SuperFlex, so that scale, shape and
+rotation learn while the position is still off.</p>
+
+<h3>Projection loss <span class="tag new">optional · render.py · --render_inst / _cls / _depth</span></h3>
+<div class="card">
+<p><b>Renderer.</b> A differentiable ray caster in PyTorch, one ray per 2 × 2 pixels (84 × 150). Per (ray, SQ) pair:
+cull against the SQ's box, take 24 SDF samples and bisect to the entry point.</p>
+<ul>
+  <li><b>Silhouette:</b> sigmoid(−SDF at the argmin / τ), with τ = half a pixel at that depth.</li>
+  <li><b>Depth:</b> the entry depth with one Newton correction.</li>
+  <li><b>Compositing:</b> front to back per ray, alpha = existence × silhouette.</li>
+</ul>
+<p>It renders the final 300 SQs. Checks: 17 ms per frame (forward + backward); target SQs rendered at existence 1 match
+the GT instance image on 94 % of pixels; gradients match finite differences.</p>
+<p><b>Terms</b>, per ray:</p>
+<ul>
+  <li><b>inst:</b> −log Σ w over the queries matched to the pixel's GT instance. It does not depend on how the instance
+    is split into SQs.</li>
+  <li><b>cls:</b> −log Σ w · p(class); no matching needed.</li>
+  <li><b>depth:</b> relative L1 to the observed depth.</li>
+</ul>
+<p class="mut">Status: first overfit ablation on 16 room_1 frames (f16s_*) running, results pending.</p>
+</div>
+
+<h2 id="training">7 · Training</h2>
+<div class="card">
+<pre>uv run python train.py --name &lt;run&gt; --topk --inputs dino --lr 3e-3 --warmup 0.05 --epochs 150 --eval_every 10
+                       [--sampling cube] [--render_inst 1 --render_cls 1 --render_depth 1]</pre>
+<ul>
+  <li><b>Optimizer.</b> AdamW (weight decay 1e-4), OneCycle with 5 % warmup, batch 8, gradient clipping 1.0.</li>
+  <li><b>Speed.</b> 0.18 s per step (0.45 s with the projection loss). A full run is 150 epochs, ≈ 1 h; the 16-frame
+    overfit is 750 epochs, ≈ 25 min.</li>
+  <li><b>Queue.</b> <code>worker.sh</code> pops <code>queue.txt</code> (two workers in parallel); logs go to
+    <code>results/&lt;run&gt;.log</code>, metrics to <code>results/&lt;run&gt;.json</code>, checkpoints and test
+    predictions to <code>results/large_files/runs/</code>, curves to trackio.</li>
+</ul>
+</div>
+
+<h2 id="eval">8 · Evaluation</h2>
+<div class="card">
+<p>On all test frames and 100 training frames, against the visible targets:</p>
+<ul>
+  <li><b>pair IoU</b> (main metric): volumetric IoU of each Hungarian-matched pair, averaged. Also split by
+    well-seen (f ≥ 0.5) and partly-visible targets.</li>
+  <li><b>dec_recall@0.5:</b> share of targets with any decoder SQ at IoU &gt; 0.5. <b>enc_recall@0.5:</b> the same for the
+    3150 proposals.</li>
+  <li><b>occupancy IoU</b> of the union of SQs with existence &gt; 0.5 against the targets' union; <b>found</b>: matched
+    queries with existence &gt; 0.5.</li>
+  <li><b>class accuracy</b> of matched queries; <b>mask coverage</b> = best predicted-instance IoU per GT instance (patch level).</li>
+  <li><b>r_*</b> (renderer): pixel instance and class accuracy of the rendered prediction, coverage, depth abs rel.</li>
+</ul>
+</div>
+
+<h2 id="tools">9 · Tools &amp; viewers</h2>
+<div class="tbl"><table>
+<tr><th>Tool</th><th>Shows</th></tr>
+<tr><td><code>viewer/server.py</code> → :8022</td><td>Serves all pages below. Visibility, renderings and sampling are computed on request.</td></tr>
+<tr><td>frames.html</td><td>A run's test predictions vs the targets in 3D, with instance masks.</td></tr>
+<tr><td>render.html</td><td>What the projection loss sees: GT / rendered targets / rendered prediction, segmentation, depth, error maps.</td></tr>
+<tr><td>occlusion.html</td><td>Every target SQ coloured by visibility ratio or sample state; old vs new visibility rule.</td></tr>
+<tr><td>sampling.html</td><td>Grid vs cube sampling side by side: per-SQ f and max gap, plus a single-SQ playground.</td></tr>
+<tr><td>index.html · ablations.html</td><td>Target decompositions · map of the top-k ablations.</td></tr>
+<tr><td><code>code/dashboard.py</code> → :7863</td><td>Trackio training curves.</td></tr>
+<tr><td><code>code/diagnose.py</code></td><td>Error decomposition of a trained model: position vs shape error, oracle proposal, selection recall, by f / size.</td></tr>
+<tr><td><code>code/probe.py</code></td><td>Linear probes on the DINO tokens (class, centre offset, scale).</td></tr>
+</table></div>
+
+<h2 id="state">Current numbers</h2>
+<div class="kpis">
+  <div class="kpi"><div class="v">0.83</div><div class="l">pair IoU, 16-frame overfit (train = eval)</div></div>
+  <div class="kpi"><div class="v">0.10</div><div class="l">pair IoU on room_0 (full run)</div></div>
+  <div class="kpi"><div class="v">0.42</div><div class="l">pair IoU on training frames (same run)</div></div>
+  <div class="kpi"><div class="v">24 cm</div><div class="l">median centre error on room_0 (5 cm on training frames)</div></div>
+</div>
+<p>These runs used the visibility caches from before 2026-11-07 and grid sampling. They fit the training scenes but do
+not generalize to room_0.</p>
+<ul>
+  <li><b>Learning curve.</b> Room_0 pair IoU is 0.064 with 3 scenes, 0.080 with 5 and 0.103 with 7; more scenes is the
+    lever that has shown an effect.</li>
+  <li><b>No effect, or worse.</b> Clipped partial targets (0.084), regularization (0.104), dropping 1–2-patch SQs (0.100)
+    and a 3-layer decoder (0.085).</li>
+  <li><b>Wider model</b> (256, 2 layers): 0.110, within the seed noise, which is unmeasured.</li>
+</ul>
+
+<h2 id="removed">Removed from this overview</h2>
+<p class="mut">Still in the code as flags, but deprecated (tried, no gain or superseded); see the README for results.</p>
+<ul class="mut">
+  <li>DETR-style query model (<code>model.Model</code>, <code>--patch_queries</code>, <code>--two_stage</code>), its Tokenizer
+    with point MLPs, and the dense model alone (<code>--dense</code>)</li>
+  <li>Sonata input (<code>--inputs all/sonata</code>; DINO alone is as good)</li>
+  <li>Union soft-IoU loss (<code>--union</code>), volumetric loss (<code>--loss vol/both</code>), SQ-level masks
+    (<code>--mask sq/sq_amodal</code>)</li>
+  <li>Clipped Chamfer for partly visible targets (<code>--partial clip</code>, <code>--clip_what</code>, <code>--vis_x</code>,
+    <code>--forced_weight</code>)</li>
+  <li>Training-set variants without gain: <code>--min_patches</code>, <code>--dropout</code> / <code>--feat_drop</code>.
+    <code>--train_frames diverse</code> was never trained: every 10th frame already covers 98 % of what the diverse selection
+    adds. <code>--flip</code>: its run never finished.</li>
+  <li>The smallest-SDF pixel owner (<code>--owner_rule sdf</code>, old caches in Thesis/data/backup)</li>
+</ul>
+</main>
+</div>
+
+<button id="cToggle">Comments</button>
+<button id="cPop">+ Comment</button>
+<aside id="cPanel" aria-label="Comments">
+  <p class="hint">Select text anywhere and click <b>+ Comment</b>, or hover a section title for <b>comment on section</b>.
+    Stored in <code>results/comments/architecture.json</code>.</p>
+  <div id="cOffline">Comments need the server: <code>uv run python experiments/22_rgbd_prediction/viewer/server.py</code>,
+    then open http://localhost:8022/architecture.html</div>
+  <div id="cNew"></div>
+  <div class="filters"><label><input type="checkbox" id="cShowResolved"> show resolved</label></div>
+  <div id="cList"></div>
+</aside>
+
+<script>
+(() => {
+  const PAGE = 'architecture', API = `/api/comments/${PAGE}`;
+  const $ = id => document.getElementById(id);
+  const main = document.querySelector('main');
+  const sections = [...main.querySelectorAll('h2[id]')];
+  const title = id => (sections.find(h => h.id === id)?.firstChild.textContent || 'page').trim();
+  let threads = [], draft = null, online = location.protocol.startsWith('http');
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const norm = s => s.replace(/\s+/g, ' ').trim();
+
+  // ---- anchoring: a thread = (section id, quoted text); highlighted via the CSS Highlight API (no DOM changes)
+  function sectionOf(node) {
+    let best = '';
+    for (const h of sections) if (h.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING || h.contains(node)) best = h.id;
+    return best;
+  }
+  function sectionNodes(id) {
+    const i = sections.findIndex(h => h.id === id);
+    const start = i >= 0 ? sections[i] : main.firstChild, end = sections[i + 1] || null;
+    const w = document.createTreeWalker(main, NodeFilter.SHOW_TEXT), out = [];
+    let n, inside = i < 0;
+    while ((n = w.nextNode())) {
+      if (!inside && start.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING) inside = true;
+      if (end && (end.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING || end.contains(n))) break;
+      if (inside && !n.parentElement.closest('.addc,.ccount')) out.push(n);
+    }
+    return out;
+  }
+  function rangeFor(t) {
+    if (!t.quote) return null;
+    const map = [];  // normalized char -> [node, offset]
+    let s = '', space = true;
+    for (const n of sectionNodes(t.section)) for (let k = 0; k < n.data.length; k++) {
+      const ws = /\s/.test(n.data[k]);
+      if (ws && space) continue;
+      s += ws ? ' ' : n.data[k]; map.push([n, k]); space = ws;
+    }
+    const q = norm(t.quote), at = s.indexOf(q);
+    if (at < 0) return null;
+    const r = document.createRange(), [a, ao] = map[at], [b, bo] = map[at + q.length - 1];
+    r.setStart(a, ao); r.setEnd(b, bo + 1);
+    return r;
+  }
+  function highlight(active) {
+    if (!window.CSS || !CSS.highlights) return;
+    const all = [], act = [];
+    for (const t of threads) {
+      if (t.resolved && !$('cShowResolved').checked) continue;
+      const r = rangeFor(t);
+      if (r) (t.id === active ? act : all).push(r);
+    }
+    CSS.highlights.set('cmt', new Highlight(...all));
+    CSS.highlights.set('cmt-active', new Highlight(...act));
+  }
+  function goto(t) {
+    const r = rangeFor(t), el = r ? r.startContainer.parentElement : document.getElementById(t.section);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    highlight(t.id);
+  }
+
+  // ---- api
+  async function call(method, path = '', body) {
+    const r = await fetch(API + path, { method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    threads = await r.json(); render();
+  }
+  async function refresh() {
+    if (!online) return;
+    try {
+      const r = await fetch(API);
+      if (!r.ok) throw 0;
+      const fresh = await r.json();
+      if (JSON.stringify(fresh) !== JSON.stringify(threads)) { threads = fresh; render(); }
+    } catch { online = false; render(); }
+  }
+
+  // ---- ui
+  function msg(m) {
+    return `<div class="msg"><span class="who ${m.author === 'Claude' ? 'claude' : ''}">${esc(m.author)}</span><span class="when">${esc(m.created || '')}</span>
+      <div>${esc(m.text)}</div></div>`;
+  }
+  function render() {
+    $('cOffline').style.display = online ? 'none' : 'block';
+    const open = threads.filter(t => !t.resolved);
+    $('cToggle').textContent = `Comments (${open.length})`;
+    document.querySelectorAll('.ccount').forEach(e => e.remove());
+    for (const h of sections) {
+      const n = open.filter(t => t.section === h.id).length;
+      if (n) h.insertAdjacentHTML('beforeend', `<span class="ccount" data-sec="${h.id}">${n}</span>`);
+    }
+    $('cNew').innerHTML = draft ? `<div class="thread"><div class="sec">${esc(title(draft.section))}</div>
+        ${draft.quote ? `<div class="q">${esc(draft.quote)}</div>` : ''}
+        <textarea class="cIn" id="cDraft" placeholder="Question or thought…"></textarea>
+        <div class="cRow"><button id="cCancel">Cancel</button><button class="pri" id="cSave">Comment</button></div></div>` : '';
+    if (draft) {
+      $('cDraft').focus();
+      $('cCancel').onclick = () => { draft = null; render(); };
+      $('cSave').onclick = () => { const text = $('cDraft').value.trim(); if (text) call('POST', '', { ...draft, text }).then(() => { draft = null; render(); }); };
+      $('cDraft').onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('cSave').click(); };
+    }
+    const order = id => { const i = sections.findIndex(h => h.id === id); return i < 0 ? -1 : i; };
+    const shown = threads.filter(t => !t.resolved || $('cShowResolved').checked).sort((a, b) => order(a.section) - order(b.section));
+    $('cList').innerHTML = shown.length ? shown.map(t => `<div class="thread ${t.resolved ? 'resolved' : ''}" data-id="${t.id}">
+        <div class="sec" data-go>${esc(title(t.section))}</div>
+        ${t.quote ? `<div class="q" data-go>${esc(t.quote)}</div>` : ''}
+        ${msg(t)}${t.replies.map(msg).join('')}
+        <div class="acts"><button data-reply>reply</button><button data-resolve>${t.resolved ? 'reopen' : 'resolve'}</button><button data-del>delete</button></div>
+        <div data-box></div></div>`).join('') : `<p class="hint">No comments yet.</p>`;
+    highlight();
+  }
+  $('cList').addEventListener('click', e => {
+    const el = e.target.closest('.thread'); if (!el) return;
+    const t = threads.find(x => x.id === el.dataset.id);
+    if (e.target.closest('[data-go]')) goto(t);
+    if (e.target.closest('[data-resolve]')) call('POST', `/${t.id}/resolve`);
+    if (e.target.closest('[data-del]') && confirm('Delete this thread?')) call('DELETE', `/${t.id}`);
+    if (e.target.closest('[data-reply]')) {
+      const box = el.querySelector('[data-box]');
+      box.innerHTML = `<textarea class="cIn"></textarea><div class="cRow"><button data-x>Cancel</button><button class="pri" data-send>Reply</button></div>`;
+      const ta = box.querySelector('textarea'); ta.focus();
+      box.querySelector('[data-x]').onclick = () => box.innerHTML = '';
+      box.querySelector('[data-send]').onclick = () => ta.value.trim() && call('POST', `/${t.id}/reply`, { text: ta.value.trim() });
+      ta.onkeydown = ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) box.querySelector('[data-send]').click(); };
+    }
+  });
+  function openPanel(on = true) { $('cPanel').classList.toggle('open', on); document.body.classList.toggle('cOpen', on); }
+  function startDraft(section, quote) { draft = { section, quote }; openPanel(); render(); }
+  $('cToggle').onclick = () => openPanel(!$('cPanel').classList.contains('open'));
+  $('cShowResolved').onchange = render;
+  for (const h of sections) {
+    h.insertAdjacentHTML('beforeend', `<span class="addc">comment on section</span>`);
+    h.querySelector('.addc').onclick = () => startDraft(h.id, '');
+  }
+  main.addEventListener('click', e => { const c = e.target.closest('.ccount'); if (c) { openPanel(); const t = threads.find(x => x.section === c.dataset.sec && !x.resolved); t && goto(t); } });
+
+  // selection -> floating button
+  const pop = $('cPop');
+  document.addEventListener('mouseup', e => {
+    if (e.target === pop || $('cPanel').contains(e.target)) return;
+    setTimeout(() => {
+      const sel = getSelection(), q = norm(sel.toString());
+      if (!q || !main.contains(sel.anchorNode)) { pop.style.display = 'none'; return; }
+      const r = sel.getRangeAt(0).getBoundingClientRect();
+      pop.style.left = `${scrollX + r.right - 40}px`; pop.style.top = `${scrollY + r.bottom + 6}px`; pop.style.display = 'block';
+      pop.onclick = () => { pop.style.display = 'none'; startDraft(sectionOf(sel.anchorNode), q.slice(0, 400)); sel.removeAllRanges(); };
+    });
+  });
+
+  render();
+  refresh();
+  setInterval(refresh, 8000);
+})();
+</script>
+</body>
+</html>

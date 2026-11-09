@@ -1,0 +1,66 @@
+--name base_5k --group B_base --steps 5000
+--name base_10k --group B_base --steps 10000
+--name inst_5k --group B_instance --steps 5000 --mask_source instance
+--name inst_5k --group B_instance --steps 5000 --mask_source instance
+--name inst1_5k --group B_instance --steps 5000 --mask_source inst1
+--name D_gt_masks --group D_fixes --steps 5000 --mask_source inst1 --gt_masks
+--name A_exist_detach --group D_fixes --steps 5000 --mask_source inst1 --exist_detach
+--name B_geo_owned --group D_fixes --steps 5000 --mask_source inst1 --geo_owned
+--name O1_lr1e-3 --group D_fixes --steps 5000 --mask_source inst1 --lr 1e-3
+--name AB_detach_owned --group D_fixes --steps 5000 --mask_source inst1 --exist_detach --geo_owned
+--name K32_lr5e-4 --group D_fixes --steps 5000 --mask_source inst1 --K 32 --lr 5e-4
+--name D_gt_masks2 --group D_fixes --steps 5000 --mask_source inst1 --gt_masks
+--name D_gt_masks3 --group D_fixes --steps 5000 --mask_source inst1 --gt_masks
+--name D_gt_masks_10k --group D_fixes --steps 10000 --mask_source inst1 --gt_masks
+--name G_no_sdf --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,pair_cd,pair_iou,free,overlap
+--name G_no_pair_cd --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,sdf,pair_iou,free,overlap
+--name G_no_pair_iou --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,sdf,pair_cd,free,overlap
+--name G_no_free --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,sdf,pair_cd,pair_iou,overlap
+--name G_no_overlap --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,sdf,pair_cd,pair_iou,free
+--name G_render_not_free --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,sdf,pair_cd,pair_iou,render,overlap
+--name G_no_targets --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,sdf,free,overlap
+--name G_targets_only --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,pair_cd,pair_iou
+--name G_iou_box --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks
+--name G_cd_only --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,pair_cd
+--name G_cd_iou --group G_loss_ablation --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,pair_cd,pair_iou
+--name U_obs_cd --group U_unsupervised --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,obs_cd
+--name U_obs_cd_render --group U_unsupervised --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,obs_cd,render
+--name U_obs_cd_free --group U_unsupervised --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,obs_cd,free
+--name U_obs_cd_render_free --group U_unsupervised --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,obs_cd,render,free
+--name U_render --group U_unsupervised --steps 10000 --mask_source inst1 --gt_masks --losses mask,dice,exist,render
+--name M_masks_only --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist
+--name M_masks_only_lr1e-3 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --lr 1e-3
+--name M2F_masks_only --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --arch m2f
+--name M2F_masks_only_lr1e-3 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --arch m2f --lr 1e-3
+--name M2F_masks_only_lr1e-4 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --arch m2f --lr 1e-4
+--name M_masks_only_lr1e-4 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --lr 1e-4
+--name M_masks_only_lr3e-4 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --lr 3e-4
+--name M_masks_only_lr3e-5 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --lr 3e-5
+--name M2F_masks_only_lr3e-5 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --arch m2f --lr 3e-5
+--name M_masks_only_lr1e-5 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --lr 1e-5
+--name M2F_masks_only_lr1e-5 --group M_mask_diagnostic --steps 10000 --mask_source inst1 --losses mask,dice,exist --arch m2f --lr 1e-5
+--name J_sa_pair_cd --group J_joint --steps 10000 --mask_source inst1 --lr 1e-5 --lr_heads 1e-3 --losses mask,dice,exist,pair_cd
+--name J_m2f_pair_cd --group J_joint --steps 10000 --mask_source inst1 --arch m2f --lr 3e-5 --lr_heads 1e-3 --losses mask,dice,exist,pair_cd
+--name J_sa_pair_cd_lr3e-5 --group J_joint --steps 10000 --mask_source inst1 --lr 3e-5 --losses mask,dice,exist,pair_cd
+--name J_sa_obs_cd --group J_joint --steps 10000 --mask_source inst1 --lr 1e-5 --lr_heads 1e-3 --losses mask,dice,exist,obs_cd
+--name J_m2f_obs_cd --group J_joint --steps 10000 --mask_source inst1 --arch m2f --lr 3e-5 --lr_heads 1e-3 --losses mask,dice,exist,obs_cd
+--name J_sa_obs_cd_lr3e-5 --group J_joint --steps 10000 --mask_source inst1 --lr 3e-5 --losses mask,dice,exist,obs_cd
+--name P_vis_lr1e-3 --group P_parts --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --lr 1e-3
+--name P_vis_lr1e-4 --group P_parts --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --lr 1e-4
+--name P_all_lr1e-3 --group P_parts --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets all --lr 1e-3
+--name P_all_lr1e-4 --group P_parts --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets all --lr 1e-4
+--name P_proj_vis_lr1e-3 --group P_parts --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance_proj --part_targets visible --lr 1e-3
+--name C_smooth --group C_collapse --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --lr 1e-3 --exist_smooth 0.01
+--name C_eps --group C_collapse --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --lr 1e-3 --adam_eps 1e-6
+--name C_match_exist --group C_collapse --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --lr 1e-3 --part_match_exist
+--name C_all --group C_collapse --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --lr 1e-3 --exist_smooth 0.01 --adam_eps 1e-6 --part_match_exist
+--name C_all_s1 --group C_collapse --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --lr 1e-3 --exist_smooth 0.01 --adam_eps 1e-6 --part_match_exist --seed 1
+--name C_all_s2 --group C_collapse --steps 10000 --gt_masks --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --lr 1e-3 --exist_smooth 0.01 --adam_eps 1e-6 --part_match_exist --seed 2
+--name R_vis_heads1e-3 --group R_parts_pred --steps 10000 --parts 16 --losses mask,dice,exist,part_cd,part_exist --lr 3e-5 --mask_source instance --part_targets visible --lr_heads 1e-3
+--name R_vis_heads1e-4 --group R_parts_pred --steps 10000 --parts 16 --losses mask,dice,exist,part_cd,part_exist --lr 3e-5 --mask_source instance --part_targets visible --lr_heads 1e-4
+--name R_vis_single3e-5 --group R_parts_pred --steps 10000 --parts 16 --losses mask,dice,exist,part_cd,part_exist --lr 3e-5 --mask_source instance --part_targets visible
+--name R_all_heads1e-3 --group R_parts_pred --steps 10000 --parts 16 --losses mask,dice,exist,part_cd,part_exist --lr 3e-5 --mask_source instance --part_targets all --lr_heads 1e-3
+--name R_proj_vis_heads1e-3 --group R_parts_pred --steps 10000 --parts 16 --losses mask,dice,exist,part_cd,part_exist --lr 3e-5 --mask_source instance_proj --part_targets visible --lr_heads 1e-3
+--name A_noanchor_gt --group A_anchor --steps 10000 --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --anchor none --gt_masks --lr 1e-3
+--name A_noanchor_pred --group A_anchor --steps 10000 --parts 16 --losses mask,dice,exist,part_cd,part_exist --mask_source instance --part_targets visible --anchor none --lr 3e-5 --lr_heads 1e-3
+--name K64_vis_heads1e-3 --group K_slots --steps 10000 --parts 16 --losses mask,dice,exist,part_cd,part_exist --lr 3e-5 --mask_source instance --part_targets visible --lr_heads 1e-3 --K 64

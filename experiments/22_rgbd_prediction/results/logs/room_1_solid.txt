@@ -1,0 +1,21 @@
+  step    0  loss 1.6401
+  step  250  loss 0.4754
+  step  500  loss 0.4603
+  step  750  loss 0.4563
+  step  999  loss 0.4551
+  step    0  loss 2.0996
+  step  250  loss 0.5119
+  step  500  loss 0.4897
+  step  750  loss 0.4826
+  step  999  loss 0.4804
+  step    0  loss 1.6449
+  step  250  loss 0.3660
+  step  500  loss 0.3459
+  step  750  loss 0.3423
+  step  999  loss 0.3411
+  step    0  loss 1.8730
+  step  250  loss 0.5805
+  step  500  loss 0.5310
+  step  750  loss 0.5113
+  step  999  loss 0.5058
+room_1 {"instances": 51, "viou": 0.8196259527462622, "precision": 0.9401928188114062, "recall": 0.8657383462838103, "primitives": 149, "seconds": 62.6}

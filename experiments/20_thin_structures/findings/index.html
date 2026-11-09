@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thin Chair Findings</title>
+<style>
+  :root { --bg: #15181d; --panel: rgba(28, 32, 39, 0.94); --fg: #e6e8eb; --muted: #9aa3ad; --accent: #5aa9ff; --line: #3a414b; --good: #4fc27a; --bad: #e5604d; --air: #f0a830; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.45 system-ui, sans-serif; overflow: hidden; }
+  #panel { position: absolute; top: 12px; left: 12px; width: 380px; max-height: calc(100% - 26px); overflow-y: auto; box-sizing: border-box; background: var(--panel);
+           border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  p { margin: 6px 0; color: var(--muted); }
+  p b { color: var(--fg); font-weight: 600; }
+  .row { margin: 10px 0; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .tabs, .choice { display: flex; gap: 4px; flex-wrap: wrap; }
+  button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; cursor: pointer; font: inherit; }
+  button.on { border-color: var(--accent); background: rgba(90, 169, 255, 0.15); }
+  select, input[type=range] { width: 100%; }
+  select { background: #1c2027; color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 4px; font: inherit; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 12px; }
+  th { color: var(--muted); font-weight: 500; text-align: right; padding: 2px 4px; }
+  th:first-child, td:first-child { text-align: left; }
+  td { padding: 2px 4px; text-align: right; border-top: 1px solid var(--line); }
+  tr.sq { cursor: pointer; }
+  tr.sq.on td { background: rgba(90, 169, 255, 0.15); }
+  tr.flake td { color: var(--bad); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .stats div { border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
+  .stats small { display: block; color: var(--muted); font-size: 10.5px; }
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
+  label { display: block; cursor: pointer; }
+  [hidden] { display: none !important; }
+  @media (max-width: 700px) { #panel { width: calc(100% - 24px); max-height: 50%; } }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Thin chair findings</h1>
+  <div class="tabs"><button id="tabSeat" class="on">Seat: over the optimization</button><button id="tabBack">Back: full vs trimmed</button></div>
+
+  <div id="seat">
+    <p>Both losses push the k-means boxes off the seat by step 100. <b>The voxel fit recovers</b> around steps 400–700. In the IoU fit two seat SQs end as flakes holding no query points, marked red.</p>
+    <div class="row"><div class="label">Fit</div><select id="fit"></select></div>
+    <div class="row"><div class="label">Step <span id="stepValue"></span></div>
+      <div class="choice"><button id="play">Play</button></div><input type="range" id="step" min="0" step="1" value="0"></div>
+    <div class="row stats" id="stats"></div>
+    <div class="row"><div class="label">Each SQ: click to isolate. Forces: + grows it</div><table id="sqs"></table></div>
+  </div>
+
+  <div id="back" hidden>
+    <p>The sheet runs far below the real panel. <b>Trimming it to the panel makes the radial loss worse but the corrected loss better</b>, so the radial distance is what keeps it long.</p>
+    <div class="row"><div class="label">Sheet</div><div class="choice"><button id="full" class="on">Full, as fitted</button><button id="trimmed">Trimmed to panel</button></div></div>
+    <div class="row"><table id="losses"></table></div>
+    <p id="backText"></p>
+  </div>
+
+  <div class="row"><div class="label">Show</div>
+    <label><input type="checkbox" id="showSq" checked> superquadrics</label>
+    <label><input type="checkbox" id="showSamples" checked> surface samples
+      <span id="legendSeat"><span class="swatch" style="background:var(--good)"></span>covered <span class="swatch" style="background:var(--bad)"></span>uncovered</span></label>
+    <label id="lostRow" hidden><input type="checkbox" id="showLost" checked> <span class="swatch" style="background:var(--bad)"></span>samples lost by trimming</label>
+    <label id="airRow" hidden><input type="checkbox" id="showAir" checked> <span class="swatch" style="background:var(--air)"></span>free query points in the sheet</label></div>
+  <div class="row"><div class="label">SQ opacity</div><input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.75"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = id => document.getElementById(id);
+const meta = await fetch('data/meta.json').then(r => r.json());
+const bin = name => fetch(`data/${name}.bin`).then(r => r.arrayBuffer());
+const verts = meta.res * meta.res, faces = meta.faces.length, samples = meta.seat + meta.back;
+const buffers = {};
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15181d);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 20);
+camera.position.set(1.7, 0.9, 2);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.8));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(2, 3, 2);
+scene.add(sun);
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+const color = j => new THREE.Color().setHSL((j * 0.618034) % 1, 0.6, 0.55);
+const good = new THREE.Color(0x4fc27a), bad = new THREE.Color(0xe5604d), dim = new THREE.Color(0x5b6470);
+const point = (array, hex, size) => {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(array, 3));
+  return new THREE.Points(g, new THREE.PointsMaterial({ size, color: hex }));
+};
+
+let mode = 'seat', fit = 'iou_scaled', step = 0, selected = -1, sheetState = 0, sq = null, timer = null;
+
+// the samples, recolored per snapshot
+const sampleXYZ = new Float32Array(await bin('samples'));
+const sampleGeometry = new THREE.BufferGeometry();
+sampleGeometry.setAttribute('position', new THREE.BufferAttribute(sampleXYZ, 3));
+sampleGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(samples * 3), 3));
+const sampleCloud = new THREE.Points(sampleGeometry, new THREE.PointsMaterial({ size: 0.006, vertexColors: true }));
+scene.add(sampleCloud);
+
+const backBuffer = await bin('back');
+const K = meta.trim.K, backVerts = K * verts * 3;
+const lostStart = 2 * backVerts * 4, airStart = lostStart + meta.trim.lost * 12;
+const lost = point(new Float32Array(backBuffer, lostStart, meta.trim.lost * 3), 0xe5604d, 0.012);
+const air = point(new Float32Array(backBuffer, airStart, meta.trim.air * 3), 0xf0a830, 0.014);
+lost.visible = air.visible = false;
+scene.add(lost, air);
+
+function mesh(positions, K, colorOf) {
+  if (sq) { scene.remove(sq); sq.geometry.dispose(); }
+  const col = new Float32Array(K * verts * 3), idx = new Uint32Array(K * faces);
+  for (let j = 0; j < K; j++) {
+    const c = colorOf(j);
+    for (let v = 0; v < verts; v++) col.set([c.r, c.g, c.b], (j * verts + v) * 3);
+    for (let f = 0; f < faces; f++) idx[j * faces + f] = meta.faces[f] + j * verts;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeVertexNormals();
+  sq = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.75, transparent: true }));
+  scene.add(sq);
+  update();
+}
+
+async function showSeat() {
+  const info = meta.fits[fit], row = info.rows[step], S = info.rows.length;
+  buffers[fit] ??= await bin(fit);
+  const buffer = buffers[fit], block = info.K * verts * 3 * 4;
+  const flake = j => row.query[j] <= 2;
+  mesh(new Float32Array(buffer, step * block, info.K * verts * 3), info.K,
+       j => selected >= 0 && j !== selected ? dim : flake(j) ? bad : color(j));
+  const covered = new Uint8Array(buffer, S * block + step * samples, samples), a = sampleGeometry.attributes.color;
+  let seat = 0, back = 0;
+  for (let i = 0; i < samples; i++) {
+    const c = covered[i] ? good : bad;
+    a.array[3 * i] = c.r; a.array[3 * i + 1] = c.g; a.array[3 * i + 2] = c.b;
+    if (covered[i]) { if (i < meta.seat) seat++; else back++; }
+  }
+  a.needsUpdate = true;
+  $('stepValue').textContent = row.step;
+  $('stats').innerHTML = [['seat covered', seat / meta.seat], ['back covered', back / meta.back], ['IoU', row.iou], ['precision', row.precision]]
+    .map(([k, v]) => `<div><small>${k}</small>${v.toFixed(2)}</div>`).join('');
+  const names = Object.keys(row.forces);
+  $('sqs').innerHTML = `<tr><th>SQ</th><th>long</th><th>thin</th><th>points</th>${names.map(n => `<th>${n}</th>`).join('')}</tr>` +
+    row.half.map((h, j) => {
+      const sorted = [...h].sort((p, q) => p - q);
+      return `<tr class="sq${flake(j) ? ' flake' : ''}${j === selected ? ' on' : ''}" data-j="${j}"><td>${j}</td><td>${sorted[2].toFixed(2)}</td><td>${sorted[0].toFixed(3)}</td><td>${row.query[j]}</td>` +
+        names.map(n => `<td>${row.forces[n][j].toFixed(3)}</td>`).join('') + '</tr>';
+    }).join('');
+  document.querySelectorAll('tr.sq').forEach(r => r.onclick = () => { selected = selected === +r.dataset.j ? -1 : +r.dataset.j; showSeat(); });
+}
+
+function showBack() {
+  const sheet = meta.trim.sheet;
+  mesh(new Float32Array(backBuffer, sheetState * backVerts * 4, backVerts), K, j => j === sheet ? color(1) : dim);
+  const a = sampleGeometry.attributes.color;
+  for (let i = 0; i < samples; i++) { const c = i < meta.seat ? dim : good; a.array[3 * i] = c.r; a.array[3 * i + 1] = c.g; a.array[3 * i + 2] = c.b; }
+  a.needsUpdate = true;
+  $('full').classList.toggle('on', sheetState === 0);
+  $('trimmed').classList.toggle('on', sheetState === 1);
+  const row = (name, r) => { const total = x => x.positive + x.free;
+    return `<tr><td>${name}</td><td>${total(r[0]).toFixed(2)}</td><td>${total(r[1]).toFixed(2)}</td><td>${total(r[1]) > total(r[0]) ? 'worse' : 'better'}</td></tr>`; };
+  $('losses').innerHTML = `<tr><th>Voxel loss</th><th>full</th><th>trimmed</th><th>trimming is</th></tr>${row('radial distance', meta.trim.radial)}${row('corrected distance', meta.trim.scaled)}`;
+  $('backText').innerHTML = `Real panel: y ${meta.trim.panel[0].toFixed(2)} to ${meta.trim.panel[1].toFixed(2)}. Sheet: y ${meta.trim.sheet_y[0].toFixed(2)} to ${meta.trim.sheet_y[1].toFixed(2)}. ` +
+    `It holds ${meta.trim.sheet_query.free} free and ${meta.trim.sheet_query.occupied} occupied query points. Trimming loses ${meta.trim.lost.toLocaleString()} of 100,000 surface samples.`;
+}
+
+function update() {
+  if (sq) { sq.visible = $('showSq').checked; sq.material.opacity = +$('opacity').value; sq.material.depthWrite = +$('opacity').value > 0.99; }
+  sampleCloud.visible = $('showSamples').checked;
+  lost.visible = mode === 'back' && $('showLost').checked;
+  air.visible = mode === 'back' && $('showAir').checked;
+}
+
+function setMode(m) {
+  mode = m;
+  stop();
+  $('seat').hidden = m !== 'seat'; $('back').hidden = m !== 'back';
+  $('tabSeat').classList.toggle('on', m === 'seat'); $('tabBack').classList.toggle('on', m === 'back');
+  $('legendSeat').hidden = m !== 'seat'; $('lostRow').hidden = m !== 'back'; $('airRow').hidden = m !== 'back';
+  m === 'seat' ? showSeat() : showBack();
+}
+
+function stop() { clearInterval(timer); timer = null; $('play').textContent = 'Play'; }
+$('play').onclick = () => {
+  if (timer) return stop();
+  $('play').textContent = 'Pause';
+  if (step === meta.steps.length - 1) step = 0;
+  timer = setInterval(() => {
+    step = step + 1;
+    if (step >= meta.steps.length) { step = meta.steps.length - 1; return stop(); }
+    $('step').value = step; showSeat();
+  }, 900);
+};
+
+$('fit').innerHTML = Object.entries(meta.fits).map(([k, v]) => `<option value="${k}">${v.title}</option>`).join('');
+$('fit').value = fit;
+$('fit').onchange = e => { fit = e.target.value; selected = -1; showSeat(); };
+$('step').max = meta.steps.length - 1;
+$('step').value = step;
+$('step').addEventListener('input', e => { stop(); step = +e.target.value; showSeat(); });
+$('tabSeat').onclick = () => setMode('seat');
+$('tabBack').onclick = () => setMode('back');
+$('full').onclick = () => { sheetState = 0; showBack(); };
+$('trimmed').onclick = () => { sheetState = 1; showBack(); };
+['showSq', 'showSamples', 'showLost', 'showAir', 'opacity'].forEach(id => $(id).addEventListener('input', update));
+setMode('seat');
+</script>
+</body>
+</html>

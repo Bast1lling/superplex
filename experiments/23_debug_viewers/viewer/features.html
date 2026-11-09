@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature Inspector</title>
+<style>
+  :root { --bg: #f7f7f5; --panel: #fff; --fg: #1d2127; --muted: #5f6873; --line: #dfe2e6; --accent: #2f6fd6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff; } }
+  :root[data-theme="dark"] { --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px;
+           display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; }
+  label { color: var(--muted); font-size: 13px; }
+  select, input, button { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+  button { cursor: pointer; } button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .seg { display: inline-flex; } .seg button { border-radius: 0; } .seg button:first-child { border-radius: 6px 0 0 6px; } .seg button:last-child { border-radius: 0 6px 6px 0; }
+  main { padding: 16px; }
+  .info { color: var(--muted); font-size: 13px; margin: 0 0 12px; max-width: 110ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px 10px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+  .card h3 span { color: var(--muted); font-weight: 400; }
+  .im { position: relative; width: 100%; aspect-ratio: 300 / 168; cursor: crosshair; background: #222; border-radius: 4px; overflow: hidden; }
+  .im img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+  .mark { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid #0f0; border-radius: 50%; pointer-events: none;
+          box-shadow: 0 0 0 1px #000; display: none; }
+  .tag { font-size: 11px; border: 1px solid var(--accent); color: var(--accent); border-radius: 9px; padding: 0 7px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Feature inspector</h1>
+  <label>scene <select id="scene"></select></label>
+  <label>frame <button id="prev">◀</button> <select id="frame"></select> <button id="next">▶</button></label>
+  <label>jump <select id="jump"><option value="">—</option></select></label>
+  <span id="tags"></span>
+  <span class="seg" id="modeSeg"><button data-m="frame" class="on">PCA per frame</button><button data-m="global">PCA global</button><button data-m="sim">similarity</button></span>
+  <label>encoder tokens of <select id="run"></select></label>
+  <label title="similarity of the clicked feature to the features of this frame">sim. in <select id="other"><option value="">same frame</option></select></label>
+  <a href="results.html">results viewer →</a>
+</header>
+<main>
+<p class="info"><b>PCA</b>: the first 3 principal components of a feature set as RGB (per frame: fitted on this frame; global: one basis per feature set from 2 frames
+of each scene, so colours are comparable across frames). <b>Similarity</b>: click any image; every panel shows the cosine similarity (0 → black, 1 → white)
+of the feature at that point to all features, optionally of another frame. Grey: no depth. DINO and the patch-pooled Sonata are at patch resolution (42×75),
+Sonata stages at pixel resolution (168×300) — a stage token covers about 8 / 16 / 32 cm.</p>
+<div class="grid" id="grid"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const PANELS = [
+  ['rgb', 'RGB', '168×300'], ['depth', 'Depth', 'turbo, 0–6 m'], ['label', 'GT instances', 'per pixel'],
+  ['dino', 'DINOv3', '42×75×1024'], ['sonata_patch', 'Sonata, patch max-pool', '42×75×1088 (model input)'],
+  ['sonata', 'Sonata, stages 2–4', '168×300×1088'], ['s2', 'Sonata stage 2', '×192'], ['s3', 'Sonata stage 3', '×384'], ['s4', 'Sonata stage 4', '×512'],
+  ['enc', 'Encoder output tokens', '42×75×128'],
+];
+const STATIC = new Set(['rgb', 'depth', 'label']);
+let data, mode = 'frame', point = null;
+const name = () => `${$('scene').value}_${$('frame').value}`;
+const kindOf = k => k === 'enc' ? `enc:${$('run').value}` : k;
+
+function build() {
+  $('grid').innerHTML = PANELS.map(([k, t, s]) => `<div class="card"><h3>${t}<span>${s}</span></h3>
+    <div class="im" data-k="${k}"><img alt="${t}"><div class="mark"></div></div></div>`).join('');
+  document.querySelectorAll('.im').forEach(el => el.addEventListener('click', e => {
+    const r = el.getBoundingClientRect();
+    point = [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height];
+    setMode('sim');
+  }));
+}
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  render();
+}
+function render() {
+  const n = name(), other = $('other').value;
+  const meta = data.meta || {}, tags = [];
+  if (meta.overfit === n) tags.push('overfit frame');
+  if ((meta.seen?.f16 || []).includes(n)) tags.push('in the 16 frames');
+  if (n.startsWith('room_0')) tags.push('test scene');
+  $('tags').innerHTML = tags.map(t => `<span class="tag">${t}</span>`).join(' ');
+  for (const el of document.querySelectorAll('.im')) {
+    const k = el.dataset.k, img = el.querySelector('img'), mark = el.querySelector('.mark');
+    if (k === 'enc' && !$('run').value) { img.removeAttribute('src'); continue; }
+    let src;
+    if (STATIC.has(k)) src = `/api/img/${n}/${k}.png`;
+    else if (mode === 'sim' && point) src = `/api/sim/${n}/${encodeURIComponent(kindOf(k))}.png?u=${point[0]}&v=${point[1]}${other ? `&other=${other}` : ''}`;
+    else src = `/api/img/${n}/${encodeURIComponent(kindOf(k))}.png?mode=${mode === 'global' ? 'global' : 'frame'}`;
+    if (STATIC.has(k) && other && mode === 'sim') src = `/api/img/${other}/${k}.png`;
+    img.src = src;
+    mark.style.display = mode === 'sim' && point && !other ? 'block' : 'none';
+    if (point) { mark.style.left = `${point[0] * 100}%`; mark.style.top = `${point[1] * 100}%`; }
+  }
+}
+function fillFrames(keep) {
+  const ids = data.scenes[$('scene').value];
+  $('frame').innerHTML = ids.map(i => `<option>${i}</option>`).join('');
+  if (keep && ids.includes(keep)) $('frame').value = keep;
+}
+function go(n) {
+  const [s, f] = [n.slice(0, n.lastIndexOf('_')), n.slice(n.lastIndexOf('_') + 1)];
+  $('scene').value = s; fillFrames(f); render();
+}
+(async () => {
+  data = await (await fetch('/api/frames')).json();
+  $('scene').innerHTML = Object.keys(data.scenes).map(s => `<option>${s}</option>`).join('');
+  $('run').innerHTML = data.runs.map(r => `<option>${r}</option>`).join('');
+  if (data.runs.includes('full_dense')) $('run').value = 'full_dense';
+  const m = data.meta || {}, jumps = [];
+  if (m.overfit) jumps.push([m.overfit, `overfit: ${m.overfit}`]);
+  for (const f of m.seen?.f16 || []) jumps.push([f, `16 frames: ${f}`]);
+  for (const f of (m.frames || []).filter(f => f.startsWith('room_0'))) jumps.push([f, `test: ${f}`]);
+  $('jump').innerHTML += jumps.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+  const all = Object.entries(data.scenes).flatMap(([s, ids]) => ids.filter((_, i) => i % 20 === 0).map(i => `${s}_${i}`));
+  $('other').innerHTML += [...new Set([...jumps.map(j => j[0]), ...all])].map(f => `<option>${f}</option>`).join('');
+  build();
+  go(m.overfit || `${Object.keys(data.scenes)[0]}_${data.scenes[Object.keys(data.scenes)[0]][0]}`);
+  $('scene').onchange = () => { fillFrames(); render(); };
+  $('frame').onchange = render;
+  $('run').onchange = render;
+  $('other').onchange = render;
+  $('jump').onchange = () => $('jump').value && go($('jump').value);
+  $('prev').onclick = () => { $('frame').selectedIndex = Math.max(0, $('frame').selectedIndex - 1); render(); };
+  $('next').onclick = () => { $('frame').selectedIndex = Math.min($('frame').options.length - 1, $('frame').selectedIndex + 1); render(); };
+  document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+})();
+</script>
+</body>
+</html>

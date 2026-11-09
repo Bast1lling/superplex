@@ -1,0 +1,57 @@
+{
+ "args": {
+  "name": "overfit_patch",
+  "epochs": 100,
+  "batch": 8,
+  "lr": 0.0001,
+  "queries": 200,
+  "eval_every": 20,
+  "patch_queries": true,
+  "overfit": "room_2_000500"
+ },
+ "test": {
+  "targets": 112.0,
+  "predicted": 36.0,
+  "cd": 0.057551342993974686,
+  "cls_acc": 1.0,
+  "occ_iou": 0.011627906933426857,
+  "found": 0.3214285969734192,
+  "occ_iou@0.3": 0.07000000029802322,
+  "found@0.3": 0.6696428656578064,
+  "predicted@0.3": 120.0,
+  "mask_cov": 0.045454545454545456,
+  "instances_pred": 1.0,
+  "instances_gt": 22.0
+ },
+ "train_eval": {
+  "targets": 112.0,
+  "predicted": 36.0,
+  "cd": 0.057551342993974686,
+  "cls_acc": 1.0,
+  "occ_iou": 0.011834319680929184,
+  "found": 0.3214285969734192,
+  "occ_iou@0.3": 0.08203677833080292,
+  "found@0.3": 0.6696428656578064,
+  "predicted@0.3": 120.0,
+  "mask_cov": 0.045454545454545456,
+  "instances_pred": 1.0,
+  "instances_gt": 22.0
+ },
+ "per_frame": [
+  {
+   "name": "room_2_000500",
+   "targets": 112,
+   "predicted": 36,
+   "cd": 0.057551342993974686,
+   "cls_acc": 1.0,
+   "occ_iou": 0.011627906933426857,
+   "found": 0.3214285969734192,
+   "occ_iou@0.3": 0.07000000029802322,
+   "found@0.3": 0.6696428656578064,
+   "predicted@0.3": 120,
+   "mask_cov": 0.045454545454545456,
+   "instances_pred": 1,
+   "instances_gt": 22
+  }
+ ]
+}

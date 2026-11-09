@@ -1,0 +1,10 @@
+--name f16_gt --setting f16 --steps 3000 --depth gt
+--name f16_pred --setting f16 --steps 3000 --depth pred
+--name f16_none --setting f16 --steps 3000 --depth none
+--name f16_pred_pose --setting f16 --steps 3000 --depth pred --pose
+--name f16_none_pose --setting f16 --steps 3000 --depth none --pose
+--name f16_pred_pose_render --setting f16 --steps 3000 --depth pred --pose --render
+--name frames_gt --setting frames --steps 4000 --depth gt
+--name frames_pred_pose --setting frames --steps 4000 --depth pred --pose
+--name frames_pred --setting frames --steps 4000 --depth pred
+--name frames_none_pose --setting frames --steps 4000 --depth none --pose

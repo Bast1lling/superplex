@@ -1,0 +1,65 @@
+{
+ "args": {
+  "name": "of_twostage_cd",
+  "epochs": 375,
+  "batch": 8,
+  "lr": 0.0001,
+  "queries": 200,
+  "eval_every": 75,
+  "patch_queries": true,
+  "loss": "cd",
+  "mask": "instance",
+  "two_stage": true,
+  "select": 300,
+  "frames": null,
+  "overfit": "room_2_000500"
+ },
+ "test": {
+  "targets": 112.0,
+  "predicted": 93.0,
+  "cd": 0.04080190509557724,
+  "pair_iou": 0.5955772399902344,
+  "cls_acc": 1.0,
+  "occ_iou": 0.4740990996360779,
+  "found": 0.8214285969734192,
+  "occ_iou@0.3": 0.6016635894775391,
+  "found@0.3": 0.9821429252624512,
+  "predicted@0.3": 128.0,
+  "mask_cov": 0.6270959017089229,
+  "instances_pred": 16.0,
+  "instances_gt": 22.0
+ },
+ "train_eval": {
+  "targets": 112.0,
+  "predicted": 93.0,
+  "cd": 0.04080190509557724,
+  "pair_iou": 0.5914077162742615,
+  "cls_acc": 1.0,
+  "occ_iou": 0.4382566511631012,
+  "found": 0.8214285969734192,
+  "occ_iou@0.3": 0.5976095795631409,
+  "found@0.3": 0.9821429252624512,
+  "predicted@0.3": 128.0,
+  "mask_cov": 0.6270959017089229,
+  "instances_pred": 16.0,
+  "instances_gt": 22.0
+ },
+ "per_frame": [
+  {
+   "name": "room_2_000500",
+   "targets": 112,
+   "predicted": 93,
+   "cd": 0.04080190509557724,
+   "pair_iou": 0.5955772399902344,
+   "cls_acc": 1.0,
+   "occ_iou": 0.4740990996360779,
+   "found": 0.8214285969734192,
+   "occ_iou@0.3": 0.6016635894775391,
+   "found@0.3": 0.9821429252624512,
+   "predicted@0.3": 128,
+   "mask_cov": 0.6270959017089229,
+   "instances_pred": 16,
+   "instances_gt": 22
+  }
+ ]
+}

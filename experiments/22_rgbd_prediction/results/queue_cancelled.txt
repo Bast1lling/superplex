@@ -1,0 +1,6 @@
+f16_topk_lr3e-3 --epochs 750 --eval_every 150 --frames 16 --topk --lr 3e-3
+f16_topk_lr1e-3_union_target --epochs 750 --eval_every 150 --frames 16 --topk --lr 1e-3 --union target
+f16_topk_lr1e-3_w256_l2 --epochs 750 --eval_every 150 --frames 16 --topk --lr 1e-3 --width 256 --layers 2
+f16_dense_lr1e-3 --epochs 750 --eval_every 150 --frames 16 --dense --lr 1e-3
+f16_topk_lr1e-3_union_obs --epochs 750 --eval_every 150 --frames 16 --topk --lr 1e-3 --union observed
+f16_topk_lr1e-3_12k --epochs 1500 --eval_every 300 --frames 16 --topk --lr 1e-3

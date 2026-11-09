@@ -1,0 +1,15 @@
+--name F1 --group ladder_room_2 --train room_2/000500 --batch 1 --n_eval 20 --K 64
+--name F10 --group ladder_room_2 --train room_2 --n_train 10 --batch 4 --n_eval 20 --K 64
+--name F150 --group ladder_room_2 --train room_2 --batch 4 --n_eval 20 --K 64
+--name F150_rotaug --group ladder_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --rot_aug 180
+--name F150_rel_grav --group ladder_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug
+--name F150_rel --group ladder_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --part_dec rel
+--name F150_rel_30k --group ladder_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --part_dec rel --steps 30000
+--name F150_rel_grav_30k --group ladder_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug --steps 30000
+--name S7_rel_grav_30k --group scenes7 --train office_0,office_1,office_2,office_3,office_4,room_1,room_2 --eval_scenes room_0 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug --steps 30000
+--name S7_d256_L3_cos_60k --group scenes7 --train office_0,office_1,office_2,office_3,office_4,room_1,room_2 --eval_scenes room_0 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug --d 256 --dec_layers 3 --lr_sched cosine --warmup 1000 --steps 60000
+--name S7_masks_only --group scenes7 --train office_0,office_1,office_2,office_3,office_4,room_1,room_2 --eval_scenes room_0 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug --losses mask,dice,exist --steps 30000
+--name F150_slotframe --group ablate_box_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug --steps 30000 --slot_frame yaw
+--name F150_slotframe_box --group ablate_box_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug --steps 30000 --slot_frame yaw --w_box 1
+--name F150_slotframe_box_hidden --group ablate_box_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug --steps 30000 --slot_frame yaw --w_box 1 --w_hidden 0.1
+--name F150_hidden --group ablate_box_room_2 --train room_2 --batch 4 --n_eval 20 --K 64 --part_dec rel --frame gravity --yaw_aug --steps 30000 --w_hidden 0.1

@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Top-k Ablation Map</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --fg: #1d2127; --muted: #5f6873; --line: #dfe2e6; --accent: #2f6fd6;
+    --img: #e2ecfb; --img-s: #2f6fd6; --geo: #e3f4e8; --geo-s: #2e8b57; --tok: #f6ecdd; --tok-s: #b7791f;
+    --dec: #efe7f8; --dec-s: #7b4fc4; --head: #fbe5e5; --head-s: #c2413b; --frozen: #eceff2; --frozen-s: #7a828c;
+    --warn: #fff4d6; --warn-s: #b88a00; --code: #f0f1f3;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff;
+    --img: #1b2a44; --img-s: #6aa8ff; --geo: #17322a; --geo-s: #5cc78d; --tok: #3a2e1b; --tok-s: #e0a64a;
+    --dec: #2c2340; --dec-s: #ae8cf0; --head: #3d2023; --head-s: #f07b74; --frozen: #262b33; --frozen-s: #9aa3ad;
+    --warn: #3a3218; --warn-s: #e3c04f; --code: #262b33;
+  } }
+  :root[data-theme="dark"] {
+    --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff;
+    --img: #1b2a44; --img-s: #6aa8ff; --geo: #17322a; --geo-s: #5cc78d; --tok: #3a2e1b; --tok-s: #e0a64a;
+    --dec: #2c2340; --dec-s: #ae8cf0; --head: #3d2023; --head-s: #f07b74; --frozen: #262b33; --frozen-s: #9aa3ad;
+    --warn: #3a3218; --warn-s: #e3c04f; --code: #262b33;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+  nav { position: sticky; top: 16px; align-self: start; font-size: 13px; }
+  nav a { display: block; color: var(--muted); text-decoration: none; padding: 3px 0 3px 10px; border-left: 2px solid var(--line); }
+  nav a:hover { color: var(--accent); border-color: var(--accent); }
+  nav .t { font-weight: 600; color: var(--fg); margin-bottom: 8px; }
+  main { min-width: 0; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 44px 0 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 22px 0 6px; }
+  p, li { max-width: 78ch; }
+  .sub { color: var(--muted); margin: 0 0 18px; }
+  code, .m { font: 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  pre { font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .tbl { overflow-x: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 12px 0; }
+  .warn { background: var(--warn); border-left: 4px solid var(--warn-s); border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 14px 0; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  .kpi .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--muted); font-size: 12px; }
+  .tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 10px; border: 1px solid; margin-left: 6px; vertical-align: 2px; }
+  .tag.frozen { color: var(--frozen-s); border-color: var(--frozen-s); }
+  .tag.train { color: var(--geo-s); border-color: var(--geo-s); }
+  .tag.new { color: var(--dec-s); border-color: var(--dec-s); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { fill: var(--fg); font: 12px system-ui, sans-serif; }
+  svg .mut { fill: var(--muted); font-size: 11px; }
+  svg .b { font-weight: 600; }
+  .suspect { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; }
+  .suspect h3 { margin: 0 0 4px; }
+  .suspect .ev { color: var(--muted); font-size: 14px; }
+  .rank { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px;
+          background: var(--head-s); color: #fff; font-size: 12px; font-weight: 700; margin-right: 8px; }
+  .rank.m { background: var(--warn-s); } .rank.l { background: var(--frozen-s); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px;
+                         background: var(--c); border: 1px solid var(--s); }
+  @media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); } nav { display: none; } }
+
+  /* comments */
+  ::highlight(cmt) { background: color-mix(in srgb, var(--warn-s) 35%, transparent); }
+  ::highlight(cmt-active) { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+  #cToggle { position: fixed; top: 14px; right: 16px; z-index: 30; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+             border-radius: 18px; padding: 6px 14px; font: 600 13px system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  #cPanel { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100vw); z-index: 25; background: var(--panel);
+            border-left: 1px solid var(--line); padding: 58px 16px 24px; overflow-y: auto; transform: translateX(100%); transition: transform .2s; }
+  #cPanel.open { transform: none; box-shadow: -4px 0 18px rgba(0,0,0,.08); }
+  body.cOpen .wrap { margin-right: min(400px, 100vw); }
+  #cPanel .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  #cPanel .filters { display: flex; gap: 12px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .thread { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 14px; background: var(--bg); }
+  .thread.resolved { opacity: .55; }
+  .thread .sec { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
+  .thread .q { border-left: 3px solid var(--warn-s); padding-left: 8px; color: var(--muted); font-size: 13px; margin: 4px 0 6px; cursor: pointer;
+               max-height: 4.5em; overflow: hidden; }
+  .msg { margin: 6px 0; white-space: pre-wrap; }
+  .msg .who { font-weight: 650; font-size: 12px; } .msg .who.claude { color: var(--dec-s); }
+  .msg .when { color: var(--muted); font-size: 11px; margin-left: 6px; }
+  .thread .acts { display: flex; gap: 10px; margin-top: 6px; font-size: 12px; }
+  .thread .acts button, .cBtn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
+  textarea.cIn { width: 100%; min-height: 64px; margin-top: 6px; font: 14px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--panel);
+                 border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; resize: vertical; }
+  .cRow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .cRow button { border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 13px; }
+  .cRow button.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #cPop { position: absolute; z-index: 40; display: none; background: var(--accent); color: #fff; border: none; border-radius: 14px; padding: 4px 12px;
+          font: 600 12px system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  h2 .addc { font-size: 12px; font-weight: 500; margin-left: 10px; opacity: 0; color: var(--accent); cursor: pointer; }
+  h2:hover .addc { opacity: 1; }
+  .ccount { display: inline-block; font-size: 11px; font-weight: 600; background: var(--warn-s); color: #fff; border-radius: 9px; padding: 0 6px;
+            margin-left: 8px; vertical-align: 3px; cursor: pointer; }
+  #cOffline { display: none; background: var(--warn); border-left: 4px solid var(--warn-s); padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="t">Contents</div>
+  <a href="#summary">Summary</a>
+  <a href="#protocol">Proposed protocol</a>
+  <a href="#budget">Latency budget</a>
+  <a href="#optim">A · Optimization</a>
+  <a href="#inputs">B · Inputs &amp; tokenizer</a>
+  <a href="#encoder">C · Encoder</a>
+  <a href="#proposals">D · Proposal stage</a>
+  <a href="#decoder">E · Decoder</a>
+  <a href="#dloss">F · Decoder loss</a>
+  <a href="#targets">G · Targets &amp; data</a>
+  <a href="#runs">All 16-frame runs</a>
+</nav>
+<main>
+<h1>Ablation map: top-k model (exp 22)</h1>
+<p class="sub">Every component of <code>model.TopKModel</code> + <code>dense.topk_losses</code> that can be switched, replaced or resized: its current
+setting, the alternatives, what the 16-frame runs say so far, and what it costs per training step. State on 2026-11-06.
+Benchmark: <code>--frames 16</code>, 6000 steps, batch 8, train = evaluation frames (42 visible SQs on average).</p>
+
+<h2 id="summary">Summary</h2>
+<div class="kpis">
+  <div class="kpi"><div class="v">66 ms</div><div class="l">default step (8 frames), 1.15 M params</div></div>
+  <div class="kpi"><div class="v">0.54 → 0.78</div><div class="l">pair IoU, lr 1e-4 → 1e-3</div></div>
+  <div class="kpi"><div class="v">0.28 → 0.78</div><div class="l">occupancy IoU @0.3, lr 1e-4 → 1e-3</div></div>
+  <div class="kpi"><div class="v">8 / 13</div><div class="l">runs of today at the old, too low lr</div></div>
+</div>
+<div class="warn"><b>Almost every comparison so far was made at lr 1e-4, which badly under-trains the model.</b> Their directions
+(e.g. "union loss helps existence", "3 decoder layers hurt") may not survive at a working learning rate. Only the learning rate itself,
+width 256 + 2 layers and the union losses were also run at 3e-4. Single seeds throughout, so the noise level is unknown.</div>
+<p>Legend for the priority column: <span class="rank">1</span> next, <span class="rank m">2</span> after the new baseline is fixed,
+<span class="rank l">3</span> later / for generalization. Step costs: measured (<code>code/component_latency.py</code>,
+<code>results/component_latency.md</code>; noise about ±5 ms) unless marked ≈ (estimated from the per-part profile).</p>
+
+<h2 id="protocol">Proposed protocol</h2>
+<ol>
+  <li><b>Fix the optimization first</b> (group A): lr sweep 1e-3 / 2e-3 / 3e-3 (+ warm-up variants), on the default top-k model. Pick the best, call it the new baseline.</li>
+  <li><b>Measure the noise</b>: the new baseline with 3 seeds. Differences below about 2 standard deviations are not interpreted.</li>
+  <li><b>One-at-a-time ablations</b> from the new baseline, highest priority first. Removing components (does it matter?) and adding components (does it help?)
+  are both one run each. 3 runs in parallel keep the GPU busy; a 16-frame run takes 10–18 min.</li>
+  <li><b>Combine</b> what helps, check the combination with seeds, then — and only then — a full run to see whether it generalizes.</li>
+</ol>
+
+<h2 id="budget">Latency budget of the default step (66 ms)</h2>
+<div class="tbl"><table>
+  <tr><th>part</th><th class="n">ms / step</th><th>note</th></tr>
+  <tr><td>host → GPU copy</td><td class="n">4</td><td>DINO tokens, Sonata tokens, depth, labels, cached assignment</td></tr>
+  <tr><td>forward: Sonata patch pooling + anchors</td><td class="n">3</td><td>self time of <code>encode</code></td></tr>
+  <tr><td>forward: input MLP</td><td class="n">1</td><td></td></tr>
+  <tr><td>forward: encoder (1 layer, 3150 tokens)</td><td class="n">4</td><td></td></tr>
+  <tr><td>forward: proposal heads (incl. 3150 × 3150 masks)</td><td class="n">1.5</td><td></td></tr>
+  <tr><td>forward: selection + decoder layer + refine heads</td><td class="n">2</td><td></td></tr>
+  <tr><td>loss: proposals (one-to-many)</td><td class="n">8</td><td>surfaces, Chamfer, masks of ≤ 512 positives per frame</td></tr>
+  <tr><td>loss: decoder (Hungarian)</td><td class="n">7</td><td>of which matching 2.5 (scipy 1)</td></tr>
+  <tr><td>backward</td><td class="n">29</td><td>dominated by the loss graphs and the encoder attention</td></tr>
+  <tr><td>optimizer</td><td class="n">1</td><td></td></tr>
+</table></div>
+<p class="sub">From <code>latency_breakdown.py</code> with CUDA syncs (sum slightly above the plain 66 ms). The heaviest knobs: each encoder layer ≈ +18 ms, each decoder layer
+≈ +13 ms (mostly its own matching and loss), each extra loss term (volumetric, union) +20–24 ms.</p>
+
+<h2 id="optim">A · Optimization</h2>
+<div class="tbl"><table>
+  <tr><th>component</th><th>current</th><th>ablations</th><th>evidence so far</th><th class="n">step cost</th><th>prio</th></tr>
+  <tr><td><b>learning rate</b></td><td>OneCycle, max 1e-4 → <b>3e-3</b> (proposed)</td><td>1e-4 … 5e-3 (done); 1e-2</td><td>sweep done (table below): every metric improves up to 3e-3; at 5e-3 geometry still improves, existence drops slightly. Optimum ≈ 3e-3 – 5e-3.</td><td class="n">0</td><td>done</td></tr>
+  <tr><td>schedule</td><td>OneCycle, warm-up 30 % → <b>5 %</b> (proposed)</td><td>constant after warm-up; step decay</td><td>5 % warm-up helps at 1e-3, 2e-3 and 3e-3, mostly existence (occ. IoU@0.5 +0.03 … +0.10)</td><td class="n">0</td><td>done</td></tr>
+  <tr><td>training length</td><td>6000 steps (f16)</td><td>12 k, 24 k</td><td>untested at a working lr (queued, cancelled)</td><td class="n">×2 time</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>batch size</td><td>8 frames</td><td>16, 32 (with lr scaled)</td><td>untested; memory 3.3 GB of 32</td><td class="n">≈ linear / step</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>weight decay, gradient clip</td><td>1e-4, 1.0</td><td>0 / 1e-2; no clip</td><td>untested. With a higher lr, clipping at 1.0 may start to bind.</td><td class="n">0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>seeds</td><td>1 (seed 0)</td><td>3 seeds of the new baseline</td><td>noise unknown</td><td class="n">×3 runs</td><td><span class="rank">1</span></td></tr>
+</table></div>
+
+<h2 id="inputs">B · Inputs &amp; tokenizer</h2>
+<div class="tbl"><table>
+  <tr><th>component</th><th>current</th><th>ablations</th><th>evidence so far</th><th class="n">step cost</th><th>prio</th></tr>
+  <tr><td>DINOv3 tokens</td><td>ViT-L/16 last layer, 1024, frozen</td><td>drop (Sonata only); other layer / multi-layer; ViT-B</td><td>untested. Answers "how much does the image matter" — central for the thesis.</td><td class="n">≈ −0.5</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>Sonata features</td><td>stages 2–4 (1088), frozen, world frame</td><td>drop (DINO + depth only); single stage; camera-frame input</td><td>untested; the feature viewer (exp 23) shows structure-aware stage-2 features</td><td class="n">≈ −3 (pooling)</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>Sonata patch pooling</td><td>max over the patch's pixels</td><td>mean; per-stage token at the patch center</td><td>untested; stage tokens are coarser than patches, so likely irrelevant</td><td class="n">0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>input MLP</td><td>LN(2112) → 256 → GELU → 128</td><td>single Linear; no LayerNorm; hidden 512</td><td>untested</td><td class="n">≈ 0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>3D position encoding</td><td>Linear(Fourier(anchor, 8 freqs, 32 m … 25 cm))</td><td>drop; + 2D grid encoding; learned</td><td>untested. DINO has its own 2D position (RoPE) but no 3D.</td><td class="n">≈ 0</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>anchor-relative translation</td><td>trans = patch centroid + Δ</td><td>absolute regression</td><td>absolute failed with learned queries (old base model, 0.3 m off)</td><td class="n">0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>augmentation</td><td>none (cached features)</td><td>horizontal flip (re-cache flipped DINO / Sonata), crops, depth scale</td><td>irrelevant for fitting 16 frames; matters for generalization</td><td class="n">cache ×2 per variant</td><td><span class="rank l">3</span></td></tr>
+</table></div>
+
+<h2 id="encoder">C · Encoder</h2>
+<div class="tbl"><table>
+  <tr><th>component</th><th>current</th><th>ablations</th><th>evidence so far</th><th class="n">step cost</th><th>prio</th></tr>
+  <tr><td><b>depth</b></td><td>1 pre-norm layer over 3150 tokens</td><td>0, 2, 4 layers</td><td>width 256 + 2 layers: pair IoU 0.54 → 0.64 at 1e-4, 0.71 → 0.76 at 3e-4 (≈ lr 1e-3 with d 128)</td><td class="n">+18 (2), +61 (4)</td><td><span class="rank">1</span></td></tr>
+  <tr><td><b>width</b></td><td>d = 128</td><td>256</td><td>only combined with 2 layers (above)</td><td class="n">+8</td><td><span class="rank">1</span></td></tr>
+  <tr><td>heads, feed-forward</td><td>8 heads, FFN 512, GELU, no dropout</td><td>4 / 16 heads, FFN 4 d</td><td>untested</td><td class="n">small</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>global attention</td><td>full self-attention over all 3150 patches</td><td>windowed / local attention; Sonata-neighbourhood attention</td><td>untested; would matter at higher resolution</td><td class="n">≤ 0</td><td><span class="rank l">3</span></td></tr>
+</table></div>
+
+<h2 id="proposals">D · Proposal stage (one SQ per patch)</h2>
+<div class="tbl"><table>
+  <tr><th>component</th><th>current</th><th>ablations</th><th>evidence so far</th><th class="n">step cost</th><th>prio</th></tr>
+  <tr><td>assignment</td><td>patch → SQ owning ≥ 50 % of its pixels (SDF-based pixel owner); thin-part fallback</td><td>any share &gt; 0; only the inner region (center sampling); prediction-aware (IoU-based) assignment</td><td>untested</td><td class="n">0 (cached)</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>existence target</td><td>CenterNet heatmap, center = deepest patch, σ = max(0.5, √n / 4)</td><td>σ / 2 or × 2; centroid patch as center; flat 0/1</td><td>flat 0/1 failed (all 0.995, 1 frame: recall 0.015); heatmap: 0.62</td><td class="n">0 (cached)</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>existence loss</td><td>penalty-reduced focal (α 2, β 4)</td><td>BCE on the heatmap; IoU-aware target</td><td>IoU-aware with NMS was dropped earlier (old model)</td><td class="n">0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>peak selection</td><td>3 × 3 max-pool NMS, then top K</td><td>no NMS; 5 × 5; SQ-IoU NMS</td><td>dense predicts 107–114 peaks &gt; 0.5 for 42 SQs: duplicates</td><td class="n">0</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>K (queries)</td><td>300</td><td>100, 900</td><td>untested for quality</td><td class="n">≈ 0 / +9</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>positive sampling</td><td>≤ 512 per frame, ∝ 1 / SQ size</td><td>all positives; uniform</td><td>untested</td><td class="n">≈ +5 (all)</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>proposal geometry loss</td><td>Chamfer 8 × 8 + forced (10 / 10)</td><td>+ volumetric pair loss; no forced</td><td>+ volumetric (1e-4): dense recall 0.42 → 0.48, top-k proposals 0.28 → 0.33 but decoder found@0.5 0.55 → 0.41</td><td class="n">+24 (both stages)</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>proposal class / mask losses</td><td>CE (2), mask BCE + Dice (5 + 5) on every positive</td><td>drop masks on proposals; drop class on proposals</td><td>untested. Mask heads + losses of both stages: 7 ms and 1.6 GB.</td><td class="n">−7 (no masks)</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>proposal vs decoder weight</td><td>1 : 1</td><td>0.5 : 1, 2 : 1</td><td>proposals in top-k are worse than in dense alone (1e-4: 0.28 vs 0.42 recall)</td><td class="n">0</td><td><span class="rank m">2</span></td></tr>
+</table></div>
+
+<h2 id="decoder">E · Decoder</h2>
+<div class="tbl"><table>
+  <tr><th>component</th><th>current</th><th>ablations</th><th>evidence so far</th><th class="n">step cost</th><th>prio</th></tr>
+  <tr><td>decoder at all</td><td>yes (top-k)</td><td>dense only</td><td>lr 1e-3: decoder recall 0.90 vs its proposals 0.54 — the decoder fixes most proposals</td><td class="n">−16</td><td><span class="rank l">3</span></td></tr>
+  <tr><td><b>layers + iterative refinement</b></td><td>1 layer</td><td>3, 6 layers (each refines the previous SQ, aux loss + own matching per layer)</td><td>3 layers at 1e-4: worse (pair IoU 0.40); likely under-trained like everything at 1e-4 — retest</td><td class="n">+27 (3), +61 (6)</td><td><span class="rank">1</span></td></tr>
+  <tr><td>query content</td><td>the selected patch's encoder token (gradient flows into the encoder)</td><td>detached token; learned embedding + token; proposal-SQ encoding only</td><td>untested; the decoder gradient may be what degrades the proposals</td><td class="n">0</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>query position</td><td>Linear(Fourier(ref. translation)) added to the residual once per layer</td><td>DETR-style: added to queries / keys in every attention; none</td><td>untested</td><td class="n">0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>self-attention between queries</td><td>yes</td><td>remove</td><td>untested; it is what lets duplicates suppress each other</td><td class="n">≈ −1</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>cross-attention memory</td><td>all 3150 encoder tokens</td><td>+ the raw input tokens; local window around the reference</td><td>untested</td><td class="n">≈ 0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>refine heads</td><td>scale = ref · exp(Δ), shape = σ(logit ref + Δ), trans = ref + Δ, zero-init</td><td>absolute heads (from the query only)</td><td>untested</td><td class="n">0</td><td><span class="rank m">2</span></td></tr>
+</table></div>
+
+<h2 id="dloss">F · Decoder loss &amp; matching</h2>
+<div class="tbl"><table>
+  <tr><th>component</th><th>current</th><th>ablations</th><th>evidence so far</th><th class="n">step cost</th><th>prio</th></tr>
+  <tr><td><b>union occupancy loss</b></td><td>off</td><td>vs target SQs / vs depth map; weight 1, 3; τ 1 cm / 5 mm / 2 cm</td><td>1e-4: found@0.5 0.55 → 0.66 / 0.63, occ.@0.3 0.28 → 0.38 / 0.30, mask cov. 0.48 → 0.55 / 0.57, geometry unchanged. 3e-4 (target): occ.@0.5 0.49 → 0.61, mask 0.78 → 0.83, pair IoU 0.71 → 0.69. 3e-4 (depth): occ.@0.5 → 0.55, @0.3 → 0.49.</td><td class="n">+24 / +20</td><td><span class="rank">1</span></td></tr>
+  <tr><td>existence loss</td><td>sigmoid focal (α 0.25, γ 2)</td><td>BCE</td><td>1e-4: BCE only shifts calibration (found@0.5 ↑, found@0.3 and occupancy ↓)</td><td class="n">0</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>geometry loss</td><td>Chamfer 16 × 16 + forced (10 / 10)</td><td>+ volumetric; no forced; samples 8 × 8</td><td>+ volumetric at 1e-4: pair IoU equal, existence worse</td><td class="n">+24 (with D)</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>matching cost</td><td>10 · Chamfer (4 × 4) + 2 · (1 − p_cls) + 1 · (1 − exist)</td><td>+ IoU / center-distance term; 6 × 6 samples; no class term</td><td>untested</td><td class="n">≈ +2 (6 × 6)</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>class loss</td><td>CE, weight 2</td><td>off (pure geometry)</td><td>class accuracy ≈ 1.0 on 16 frames</td><td class="n">≈ 0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>mask loss / heads</td><td>instance mask BCE + Dice (5 + 5)</td><td>off; SQ-level masks</td><td>SQ-level masks: no geometry change (old model)</td><td class="n">−7 (no masks)</td><td><span class="rank m">2</span></td></tr>
+  <tr><td>loss weights</td><td>see <code>train.W</code></td><td>exist 2 → 5; forced 10 → 0 after warm-up</td><td>untested</td><td class="n">0</td><td><span class="rank l">3</span></td></tr>
+</table></div>
+
+<h2 id="targets">G · Targets &amp; data</h2>
+<div class="tbl"><table>
+  <tr><th>component</th><th>current</th><th>ablations</th><th>evidence so far</th><th class="n">step cost</th><th>prio</th></tr>
+  <tr><td>visible-only targets</td><td>SQs that own ≥ 1 pixel</td><td>all SQs touching the frustum (incl. hidden)</td><td>hidden targets were a suspect for the old model; not re-tested</td><td class="n">0</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>target decomposition</td><td><code>targets_winding</code> (SuperFlex + post-opt. per GT instance)</td><td>exp 08 volumetric decomposition; one SQ per instance</td><td>suspected to be inconsistent across frames (generalization)</td><td class="n">0 (re-cache)</td><td><span class="rank l">3</span></td></tr>
+  <tr><td>benchmark frames</td><td>16 frames evenly over 7 scenes</td><td>32 / 64 frames; held-out frames of the same scenes</td><td>—</td><td class="n">—</td><td><span class="rank m">2</span></td></tr>
+</table></div>
+
+<h2 id="runs">All 16-frame runs (top-k unless noted)</h2>
+<div class="tbl"><table>
+  <tr><th>run</th><th class="n">lr</th><th class="n">proposal recall@0.5</th><th class="n">dec. recall@0.5</th><th class="n">pair IoU</th><th class="n">found 0.5 / 0.3</th><th class="n">occ. IoU 0.5 / 0.3</th><th class="n">mask cov.</th></tr>
+  <tr><td>f16_topk (baseline)</td><td class="n">1e-4</td><td class="n">0.28</td><td class="n">–</td><td class="n">0.54</td><td class="n">0.55 / 0.85</td><td class="n">0.16 / 0.28</td><td class="n">0.48</td></tr>
+  <tr><td>+ volumetric</td><td class="n">1e-4</td><td class="n">0.33</td><td class="n">0.57</td><td class="n">0.54</td><td class="n">0.41 / 0.84</td><td class="n">0.10 / 0.31</td><td class="n">0.39</td></tr>
+  <tr><td>+ union target</td><td class="n">1e-4</td><td class="n">0.24</td><td class="n">0.58</td><td class="n">0.54</td><td class="n">0.66 / 0.90</td><td class="n">0.21 / 0.38</td><td class="n">0.55</td></tr>
+  <tr><td>+ union target, weight 3</td><td class="n">1e-4</td><td class="n">0.26</td><td class="n">0.51</td><td class="n">0.51</td><td class="n">0.70 / 0.91</td><td class="n">0.30 / 0.38</td><td class="n">0.60</td></tr>
+  <tr><td>+ union depth</td><td class="n">1e-4</td><td class="n">0.29</td><td class="n">0.56</td><td class="n">0.54</td><td class="n">0.63 / 0.91</td><td class="n">0.22 / 0.30</td><td class="n">0.57</td></tr>
+  <tr><td>BCE existence</td><td class="n">1e-4</td><td class="n">0.28</td><td class="n">0.55</td><td class="n">0.54</td><td class="n">0.66 / 0.77</td><td class="n">0.14 / 0.21</td><td class="n">0.54</td></tr>
+  <tr><td>3 decoder layers</td><td class="n">1e-4</td><td class="n">0.21</td><td class="n">0.35</td><td class="n">0.40</td><td class="n">0.68 / 0.91</td><td class="n">0.16 / 0.31</td><td class="n">0.57</td></tr>
+  <tr><td>width 256, 2 layers</td><td class="n">1e-4</td><td class="n">0.40</td><td class="n">0.73</td><td class="n">0.64</td><td class="n">0.75 / 0.92</td><td class="n">0.32 / 0.48</td><td class="n">0.65</td></tr>
+  <tr><td>default</td><td class="n">3e-4</td><td class="n">0.44</td><td class="n">0.83</td><td class="n">0.71</td><td class="n">0.90 / 0.97</td><td class="n">0.49 / 0.62</td><td class="n">0.78</td></tr>
+  <tr><td>+ union target</td><td class="n">3e-4</td><td class="n">0.41</td><td class="n">0.80</td><td class="n">0.69</td><td class="n">0.93 / 0.98</td><td class="n">0.61 / 0.68</td><td class="n">0.83</td></tr>
+  <tr><td>+ union depth</td><td class="n">3e-4</td><td class="n">0.45</td><td class="n">0.86</td><td class="n">0.71</td><td class="n">0.91 / 0.97</td><td class="n">0.55 / 0.49</td><td class="n">0.78</td></tr>
+  <tr><td>width 256, 2 layers</td><td class="n">3e-4</td><td class="n">0.52</td><td class="n">0.90</td><td class="n">0.76</td><td class="n">0.95 / 0.98</td><td class="n">0.60 / 0.70</td><td class="n">0.83</td></tr>
+  <tr><td>default, warm-up 5 %</td><td class="n">1e-3</td><td class="n">0.54</td><td class="n">0.91</td><td class="n">0.78</td><td class="n">0.96 / 1.00</td><td class="n">0.71 / 0.79</td><td class="n">0.88</td></tr>
+  <tr><td>default</td><td class="n">2e-3</td><td class="n">0.60</td><td class="n">0.94</td><td class="n">0.80</td><td class="n">0.95 / 0.99</td><td class="n">0.73 / 0.81</td><td class="n">0.88</td></tr>
+  <tr><td>default, warm-up 5 %</td><td class="n">2e-3</td><td class="n">0.60</td><td class="n">0.95</td><td class="n">0.81</td><td class="n">0.96 / 1.00</td><td class="n">0.76 / 0.83</td><td class="n">0.88</td></tr>
+  <tr><td>default</td><td class="n">3e-3</td><td class="n">0.64</td><td class="n">0.96</td><td class="n">0.82</td><td class="n">0.97 / 0.99</td><td class="n">0.75 / 0.83</td><td class="n">0.88</td></tr>
+  <tr><td><b>default, warm-up 5 % (proposed baseline)</b></td><td class="n"><b>3e-3</b></td><td class="n">0.66</td><td class="n">0.95</td><td class="n">0.82</td><td class="n"><b>0.97 / 1.00</b></td><td class="n"><b>0.79 / 0.87</b></td><td class="n"><b>0.89</b></td></tr>
+  <tr><td>default</td><td class="n">5e-3</td><td class="n"><b>0.70</b></td><td class="n"><b>0.97</b></td><td class="n"><b>0.83</b></td><td class="n">0.96 / 0.99</td><td class="n">0.72 / 0.84</td><td class="n">0.87</td></tr>
+  <tr><td>default</td><td class="n">1e-3</td><td class="n">0.54</td><td class="n">0.90</td><td class="n">0.78</td><td class="n">0.93 / 0.99</td><td class="n">0.61 / 0.78</td><td class="n">0.82</td></tr>
+  <tr><td>dense (baseline)</td><td class="n">1e-4</td><td class="n">0.42</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">0.38 (exist &gt; 0.5)</td><td class="n">–</td></tr>
+  <tr><td>dense + volumetric</td><td class="n">1e-4</td><td class="n">0.48</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">0.39</td><td class="n">–</td></tr>
+</table></div>
+<p class="sub">Final evaluation on all 16 frames. <code>uv run python code/compare.py</code> prints the current table from <code>results/*.json</code>.</p>
+</main>
+</div>
+
+<button id="cToggle">Comments</button>
+<button id="cPop">+ Comment</button>
+<aside id="cPanel" aria-label="Comments">
+  <p class="hint">Select text anywhere and click <b>+ Comment</b>, or hover a section title for <b>comment on section</b>.
+    Stored in <code>results/comments/ablations.json</code>.</p>
+  <div id="cOffline">Comments need the server: <code>uv run python experiments/22_rgbd_prediction/viewer/server.py</code>,
+    then open http://localhost:8022/ablations.html</div>
+  <div id="cNew"></div>
+  <div class="filters"><label><input type="checkbox" id="cShowResolved"> show resolved</label></div>
+  <div id="cList"></div>
+</aside>
+
+<script>
+(() => {
+  const PAGE = 'ablations', API = `/api/comments/${PAGE}`;
+  const $ = id => document.getElementById(id);
+  const main = document.querySelector('main');
+  const sections = [...main.querySelectorAll('h2[id]')];
+  const title = id => (sections.find(h => h.id === id)?.firstChild.textContent || 'page').trim();
+  let threads = [], draft = null, online = location.protocol.startsWith('http');
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const norm = s => s.replace(/\s+/g, ' ').trim();
+
+  // ---- anchoring: a thread = (section id, quoted text); highlighted via the CSS Highlight API (no DOM changes)
+  function sectionOf(node) {
+    let best = '';
+    for (const h of sections) if (h.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING || h.contains(node)) best = h.id;
+    return best;
+  }
+  function sectionNodes(id) {
+    const i = sections.findIndex(h => h.id === id);
+    const start = i >= 0 ? sections[i] : main.firstChild, end = sections[i + 1] || null;
+    const w = document.createTreeWalker(main, NodeFilter.SHOW_TEXT), out = [];
+    let n, inside = i < 0;
+    while ((n = w.nextNode())) {
+      if (!inside && start.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING) inside = true;
+      if (end && (end.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING || end.contains(n))) break;
+      if (inside && !n.parentElement.closest('.addc,.ccount')) out.push(n);
+    }
+    return out;
+  }
+  function rangeFor(t) {
+    if (!t.quote) return null;
+    const map = [];  // normalized char -> [node, offset]
+    let s = '', space = true;
+    for (const n of sectionNodes(t.section)) for (let k = 0; k < n.data.length; k++) {
+      const ws = /\s/.test(n.data[k]);
+      if (ws && space) continue;
+      s += ws ? ' ' : n.data[k]; map.push([n, k]); space = ws;
+    }
+    const q = norm(t.quote), at = s.indexOf(q);
+    if (at < 0) return null;
+    const r = document.createRange(), [a, ao] = map[at], [b, bo] = map[at + q.length - 1];
+    r.setStart(a, ao); r.setEnd(b, bo + 1);
+    return r;
+  }
+  function highlight(active) {
+    if (!window.CSS || !CSS.highlights) return;
+    const all = [], act = [];
+    for (const t of threads) {
+      if (t.resolved && !$('cShowResolved').checked) continue;
+      const r = rangeFor(t);
+      if (r) (t.id === active ? act : all).push(r);
+    }
+    CSS.highlights.set('cmt', new Highlight(...all));
+    CSS.highlights.set('cmt-active', new Highlight(...act));
+  }
+  function goto(t) {
+    const r = rangeFor(t), el = r ? r.startContainer.parentElement : document.getElementById(t.section);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    highlight(t.id);
+  }
+
+  // ---- api
+  async function call(method, path = '', body) {
+    const r = await fetch(API + path, { method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    threads = await r.json(); render();
+  }
+  async function refresh() {
+    if (!online) return;
+    try {
+      const r = await fetch(API);
+      if (!r.ok) throw 0;
+      const fresh = await r.json();
+      if (JSON.stringify(fresh) !== JSON.stringify(threads)) { threads = fresh; render(); }
+    } catch { online = false; render(); }
+  }
+
+  // ---- ui
+  function msg(m) {
+    return `<div class="msg"><span class="who ${m.author === 'Claude' ? 'claude' : ''}">${esc(m.author)}</span><span class="when">${esc(m.created || '')}</span>
+      <div>${esc(m.text)}</div></div>`;
+  }
+  function render() {
+    $('cOffline').style.display = online ? 'none' : 'block';
+    const open = threads.filter(t => !t.resolved);
+    $('cToggle').textContent = `Comments (${open.length})`;
+    document.querySelectorAll('.ccount').forEach(e => e.remove());
+    for (const h of sections) {
+      const n = open.filter(t => t.section === h.id).length;
+      if (n) h.insertAdjacentHTML('beforeend', `<span class="ccount" data-sec="${h.id}">${n}</span>`);
+    }
+    $('cNew').innerHTML = draft ? `<div class="thread"><div class="sec">${esc(title(draft.section))}</div>
+        ${draft.quote ? `<div class="q">${esc(draft.quote)}</div>` : ''}
+        <textarea class="cIn" id="cDraft" placeholder="Question or thought…"></textarea>
+        <div class="cRow"><button id="cCancel">Cancel</button><button class="pri" id="cSave">Comment</button></div></div>` : '';
+    if (draft) {
+      $('cDraft').focus();
+      $('cCancel').onclick = () => { draft = null; render(); };
+      $('cSave').onclick = () => { const text = $('cDraft').value.trim(); if (text) call('POST', '', { ...draft, text }).then(() => { draft = null; render(); }); };
+      $('cDraft').onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('cSave').click(); };
+    }
+    const order = id => { const i = sections.findIndex(h => h.id === id); return i < 0 ? -1 : i; };
+    const shown = threads.filter(t => !t.resolved || $('cShowResolved').checked).sort((a, b) => order(a.section) - order(b.section));
+    $('cList').innerHTML = shown.length ? shown.map(t => `<div class="thread ${t.resolved ? 'resolved' : ''}" data-id="${t.id}">
+        <div class="sec" data-go>${esc(title(t.section))}</div>
+        ${t.quote ? `<div class="q" data-go>${esc(t.quote)}</div>` : ''}
+        ${msg(t)}${t.replies.map(msg).join('')}
+        <div class="acts"><button data-reply>reply</button><button data-resolve>${t.resolved ? 'reopen' : 'resolve'}</button><button data-del>delete</button></div>
+        <div data-box></div></div>`).join('') : `<p class="hint">No comments yet.</p>`;
+    highlight();
+  }
+  $('cList').addEventListener('click', e => {
+    const el = e.target.closest('.thread'); if (!el) return;
+    const t = threads.find(x => x.id === el.dataset.id);
+    if (e.target.closest('[data-go]')) goto(t);
+    if (e.target.closest('[data-resolve]')) call('POST', `/${t.id}/resolve`);
+    if (e.target.closest('[data-del]') && confirm('Delete this thread?')) call('DELETE', `/${t.id}`);
+    if (e.target.closest('[data-reply]')) {
+      const box = el.querySelector('[data-box]');
+      box.innerHTML = `<textarea class="cIn"></textarea><div class="cRow"><button data-x>Cancel</button><button class="pri" data-send>Reply</button></div>`;
+      const ta = box.querySelector('textarea'); ta.focus();
+      box.querySelector('[data-x]').onclick = () => box.innerHTML = '';
+      box.querySelector('[data-send]').onclick = () => ta.value.trim() && call('POST', `/${t.id}/reply`, { text: ta.value.trim() });
+      ta.onkeydown = ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) box.querySelector('[data-send]').click(); };
+    }
+  });
+  function openPanel(on = true) { $('cPanel').classList.toggle('open', on); document.body.classList.toggle('cOpen', on); }
+  function startDraft(section, quote) { draft = { section, quote }; openPanel(); render(); }
+  $('cToggle').onclick = () => openPanel(!$('cPanel').classList.contains('open'));
+  $('cShowResolved').onchange = render;
+  for (const h of sections) {
+    h.insertAdjacentHTML('beforeend', `<span class="addc">comment on section</span>`);
+    h.querySelector('.addc').onclick = () => startDraft(h.id, '');
+  }
+  main.addEventListener('click', e => { const c = e.target.closest('.ccount'); if (c) { openPanel(); const t = threads.find(x => x.section === c.dataset.sec && !x.resolved); t && goto(t); } });
+
+  // selection -> floating button
+  const pop = $('cPop');
+  document.addEventListener('mouseup', e => {
+    if (e.target === pop || $('cPanel').contains(e.target)) return;
+    setTimeout(() => {
+      const sel = getSelection(), q = norm(sel.toString());
+      if (!q || !main.contains(sel.anchorNode)) { pop.style.display = 'none'; return; }
+      const r = sel.getRangeAt(0).getBoundingClientRect();
+      pop.style.left = `${scrollX + r.right - 40}px`; pop.style.top = `${scrollY + r.bottom + 6}px`; pop.style.display = 'block';
+      pop.onclick = () => { pop.style.display = 'none'; startDraft(sectionOf(sel.anchorNode), q.slice(0, 400)); sel.removeAllRanges(); };
+    });
+  });
+
+  render();
+  refresh();
+  setInterval(refresh, 8000);
+})();
+</script>
+</body>
+</html>

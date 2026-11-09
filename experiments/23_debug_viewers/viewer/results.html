@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prediction Inspector</title>
+<style>
+  :root { --bg: #f7f7f5; --panel: #fff; --fg: #1d2127; --muted: #5f6873; --line: #dfe2e6; --accent: #2f6fd6; --good: #2e8b57; --bad: #c2413b; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff; --good: #5cc78d; --bad: #f07b74; } }
+  :root[data-theme="dark"] { --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff; --good: #5cc78d; --bad: #f07b74; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.45 system-ui, sans-serif; }
+  .app { display: grid; grid-template-columns: 330px minmax(0, 1fr); height: 100vh; }
+  aside { overflow-y: auto; border-right: 1px solid var(--line); background: var(--panel); padding: 12px 14px 30px; }
+  aside h1 { font-size: 15px; margin: 0 0 2px; } aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 6px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; flex-wrap: wrap; }
+  .row > label:first-child { min-width: 78px; color: var(--muted); }
+  select, input, button { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+  select { max-width: 200px; } button { cursor: pointer; }
+  input[type=range] { width: 140px; padding: 0; }
+  .chk label { margin-right: 10px; white-space: nowrap; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { padding: 2px 4px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+  td:first-child, th:first-child { text-align: left; } th { color: var(--muted); font-weight: 600; }
+  tr.cur td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .tag { display: inline-block; font-size: 11px; border-radius: 9px; padding: 0 8px; border: 1px solid; }
+  .tag.seen { color: var(--good); } .tag.unseen { color: var(--bad); }
+  #sel { white-space: pre-wrap; font: 12px/1.45 ui-monospace, Menlo, monospace; background: var(--bg); border-radius: 6px; padding: 6px 8px; min-height: 40px; }
+  .view { position: relative; min-width: 0; }
+  #three { position: absolute; inset: 0; }
+  #img2d { position: absolute; right: 12px; bottom: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+  #img2d canvas { display: block; width: min(600px, 45vw); image-rendering: pixelated; cursor: crosshair; }
+  #img2d .row { margin: 0 0 4px; }
+  .legend { color: var(--muted); font-size: 12px; }
+  .grad { display: inline-block; width: 90px; height: 9px; border-radius: 4px; vertical-align: middle; background: linear-gradient(90deg, hsl(0 75% 50%), hsl(60 75% 50%), hsl(120 65% 42%)); }
+  #msg { position: absolute; top: 12px; left: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; display: none; }
+  @media (max-width: 800px) { .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 70vh; height: auto; } }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div class="app">
+<aside>
+  <h1>Prediction inspector</h1>
+  <div class="legend">exp 22 checkpoints on 37 frames (<code>code/predict.py</code>) · <a href="features.html">features →</a></div>
+  <h2>Run &amp; frame</h2>
+  <div class="row"><label>run</label><select id="run"></select></div>
+  <div class="row"><label>frame</label><select id="frame"></select><button id="prev">◀</button><button id="next">▶</button></div>
+  <div class="row"><label></label><span id="seen"></span></div>
+  <h2>Show</h2>
+  <div class="row chk"><label><input type="checkbox" id="sPts" checked> points</label><label><input type="checkbox" id="sGt" checked> GT visible</label>
+    <label><input type="checkbox" id="sHid"> GT hidden</label></div>
+  <div class="row chk"><label><input type="checkbox" id="sPred" checked> <span id="predName">prediction</span></label>
+    <label id="propWrap"><input type="checkbox" id="sProp"> proposals</label><label><input type="checkbox" id="sPeak" checked> peaks only</label></div>
+  <div class="row"><label>existence &gt;</label><input type="range" id="thr" min="0" max="1" step="0.01" value="0.3"><span id="thrV"></span></div>
+  <div class="row"><label>max SQs</label><input type="range" id="maxN" min="1" max="300" step="1" value="300"><span id="maxV"></span></div>
+  <div class="row"><label>colour</label><select id="col"><option value="iou">IoU with best visible target</option><option value="cls">class correct</option>
+    <option value="inst">GT instance of best target</option><option value="exist">existence</option></select></div>
+  <div class="row"><label>opacity</label><input type="range" id="op" min="0.1" max="1" step="0.05" value="0.55"><label><input type="checkbox" id="wire"> wireframe</label></div>
+  <div class="row legend"><span class="grad"></span> IoU 0 → 0.8 · GT: grey wireframe (hidden: faint)</div>
+  <div class="row"><button id="camBtn">camera view</button><span class="legend">click an SQ to inspect it</span></div>
+  <h2>Selected</h2>
+  <div id="sel">—</div>
+  <h2>Frame metrics</h2>
+  <table id="fm"></table>
+  <h2>All runs (mean over seen / unseen frames)</h2>
+  <table id="sum"></table>
+</aside>
+<div class="view">
+  <div id="three"></div>
+  <div id="msg"></div>
+  <div id="img2d">
+    <div class="row"><select id="ov"><option value="exist">predicted existence</option><option value="heat">GT heatmap target</option>
+      <option value="owner">GT patch owner</option><option value="none">RGB only</option></select>
+      <label class="legend"><input type="checkbox" id="dots" checked> shown SQs</label><button id="hide2d">hide</button></div>
+    <canvas id="cv" width="600" height="336"></canvas>
+  </div>
+</div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const $ = id => document.getElementById(id);
+const GH = 42, GW = 75, FY = 150, H = 168, W = 300;
+let summary = {}, classes = [], frames = [], gt = null, pred = null, rgbImg = null, selected = null;
+
+// ---------- three
+const scene = new THREE.Scene();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setClearColor(0x2a2f36);
+$('three').appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(2 * Math.atan(H / 2 / FY) * 180 / Math.PI, 1, 0.01, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.2));
+const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(1, -2, -1); scene.add(dl);
+const groups = { pts: new THREE.Group(), gt: new THREE.Group(), hid: new THREE.Group(), pred: new THREE.Group(), sel: new THREE.Group() };
+Object.values(groups).forEach(g => scene.add(g));
+function camView() { camera.position.set(0, -0.8, -1.6); camera.up.set(0, -1, 0); controls.target.set(0, 0, 2.5); controls.update(); }
+camView();
+function resize() { const el = $('three'); renderer.setSize(el.clientWidth, el.clientHeight); camera.aspect = el.clientWidth / el.clientHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize);
+renderer.setAnimationLoop(() => renderer.render(scene, camera));
+
+const spow = (x, p) => Math.sign(x) * Math.pow(Math.abs(x), p);
+function sqGeometry(s, e, R, t, n = 14) {
+  const pos = [], idx = [];
+  for (let i = 0; i <= n; i++) {
+    const eta = -Math.PI / 2 + Math.PI * i / n;
+    for (let j = 0; j < 2 * n; j++) {
+      const om = -Math.PI + Math.PI * j / n;
+      const ce = spow(Math.cos(eta), e[0]);
+      const p = [s[0] * ce * spow(Math.cos(om), e[1]), s[1] * ce * spow(Math.sin(om), e[1]), s[2] * spow(Math.sin(eta), e[0])];
+      for (let k = 0; k < 3; k++) pos.push(R[3 * k] * p[0] + R[3 * k + 1] * p[1] + R[3 * k + 2] * p[2] + t[k]);
+    }
+  }
+  for (let i = 0; i < n; i++) for (let j = 0; j < 2 * n; j++) {
+    const a = i * 2 * n + j, b = i * 2 * n + (j + 1) % (2 * n), c = a + 2 * n, d = b + 2 * n;
+    idx.push(a, c, b, b, c, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+function clear(g) { while (g.children.length) { const c = g.children.pop(); c.geometry?.dispose(); c.material?.dispose(); } }
+const iouColor = v => new THREE.Color().setHSL(Math.min(Math.max(v, 0), 0.8) / 0.8 * 0.333, 0.75, 0.48);
+const instColor = i => new THREE.Color().setHSL(((i * 0.6180339) % 1 + 1) % 1, 0.65, 0.55);
+
+// ---------- data
+const getJSON = async u => { const r = await fetch(u); if (!r.ok) throw new Error(await r.text()); return r.json(); };
+async function loadCloud(name) {
+  const buf = await (await fetch(`/api/cloud/${name}`)).arrayBuffer();
+  const n = new Int32Array(buf, 0, 1)[0];
+  const xyz = new Float32Array(buf, 4, n * 3), rgb = new Uint8Array(buf, 4 + n * 12, n * 3);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(xyz, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(rgb, 3, true));
+  clear(groups.pts);
+  groups.pts.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 0.012, vertexColors: true })));
+}
+function shownSQs() {
+  if (!pred) return [];
+  const thr = +$('thr').value, out = [];
+  const add = (list, src) => {
+    let l = list.filter(q => q.exist > thr && (src === 'dec' || !$('sPeak').checked || q.peak));
+    l.sort((a, b) => b.exist - a.exist);
+    out.push(...l.slice(0, +$('maxN').value).map(q => ({ ...q, src })));
+  };
+  if (pred.kind === 'topk') { if ($('sPred').checked) add(pred.decoder, 'dec'); if ($('sProp').checked) add(pred.proposals, 'prop'); }
+  else if ($('sPred').checked) add(pred.proposals, 'prop');
+  return out;
+}
+function colorOf(q) {
+  const mode = $('col').value, t = q.src === 'dec' && q.match_t !== undefined ? q.match_t : q.best_t;
+  if (mode === 'iou') return iouColor(q.best_iou);
+  if (mode === 'exist') return new THREE.Color().setHSL(0.66 - 0.66 * q.exist, 0.8, 0.5);
+  if (mode === 'cls') return t < 0 ? new THREE.Color(0x888888) : new THREE.Color(gt.cls[t] === q.cls ? 0x2e8b57 : 0xc2413b);
+  return t < 0 ? new THREE.Color(0x888888) : instColor(gt.instance[t]);
+}
+function drawGT() {
+  clear(groups.gt); clear(groups.hid);
+  if (!gt) return;
+  gt.scale.forEach((s, i) => {
+    const vis = gt.visible[i], g = vis ? groups.gt : groups.hid;
+    const c = $('col').value === 'inst' ? instColor(gt.instance[i]) : new THREE.Color(0x9aa3ad);
+    const m = new THREE.Mesh(sqGeometry(s, gt.shape[i], gt.rot[i], gt.trans[i], 10),
+      new THREE.MeshBasicMaterial({ color: c, wireframe: true, transparent: true, opacity: vis ? 0.35 : 0.12 }));
+    m.userData = { gt: i };
+    g.add(m);
+  });
+}
+function drawPred() {
+  clear(groups.pred);
+  const op = +$('op').value, wire = $('wire').checked;
+  for (const q of shownSQs()) {
+    const mat = wire ? new THREE.MeshBasicMaterial({ color: colorOf(q), wireframe: true })
+      : new THREE.MeshStandardMaterial({ color: colorOf(q), transparent: op < 1, opacity: op, side: THREE.DoubleSide, depthWrite: op >= 1, roughness: 0.7 });
+    const m = new THREE.Mesh(sqGeometry(q.scale, q.shape, q.rot, q.trans), mat);
+    m.userData = { q };
+    groups.pred.add(m);
+  }
+  $('thrV').textContent = (+$('thr').value).toFixed(2);
+  $('maxV').textContent = $('maxN').value;
+  drawSel(); draw2d();
+}
+function drawSel() {
+  clear(groups.sel);
+  if (!selected) { $('sel').textContent = '—'; return; }
+  const q = selected, t = q.src === 'dec' && q.match_t !== undefined ? q.match_t : q.best_t;
+  groups.sel.add(new THREE.Mesh(sqGeometry(q.scale, q.shape, q.rot, q.trans), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true })));
+  if (t >= 0) groups.sel.add(new THREE.Mesh(sqGeometry(gt.scale[t], gt.shape[t], gt.rot[t], gt.trans[t]), new THREE.MeshBasicMaterial({ color: 0xffd400, wireframe: true })));
+  const f = a => a.map(v => v.toFixed(3)).join(', ');
+  const patch = q.src === 'dec' ? q.patch : q.q;
+  let s = `${q.src === 'dec' ? 'decoder query ' + q.q : 'proposal'} · patch (${Math.floor(patch / GW)}, ${patch % GW})${q.peak === false ? ' (not a peak)' : ''}
+existence ${q.exist.toFixed(3)} · class ${classes[q.cls]}
+scale ${f(q.scale)}  shape ${f(q.shape)}
+trans ${f(q.trans)}
+best visible target ${q.best_t}: IoU ${q.best_iou.toFixed(3)}`;
+  if (q.best_t >= 0) s += ` (${classes[gt.cls[q.best_t]]}, instance ${gt.instance[q.best_t]})`;
+  if (q.src === 'dec') s += q.match_t !== undefined ? `\nHungarian match: target ${q.match_t}, IoU ${q.match_iou.toFixed(3)} (${classes[gt.cls[q.match_t]]})` : '\nunmatched (a negative in training)';
+  if (t >= 0) s += `\ntarget scale ${f(gt.scale[t])}  shape ${f(gt.shape[t])}\n(white = this SQ, yellow = its target)`;
+  $('sel').textContent = s;
+}
+
+// ---------- 2D
+const cv = $('cv'), ctx = cv.getContext('2d'), SC = cv.width / W;
+function draw2d() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (rgbImg) ctx.drawImage(rgbImg, 0, 0, cv.width, cv.height);
+  const ov = $('ov').value, cell = 4 * SC;
+  if (gt && pred && ov !== 'none') for (let i = 0; i < GH * GW; i++) {
+    const y = Math.floor(i / GW), x = i % GW;
+    if (ov === 'owner') { const o = gt.owner[i]; if (o < 0) continue; ctx.fillStyle = `#${instColor(o).getHexString()}`; ctx.globalAlpha = 0.5; }
+    else { const v = ov === 'exist' ? pred.exist[i] : gt.heat[i]; ctx.fillStyle = `#${new THREE.Color().setHSL(0.66 - 0.66 * v, 0.9, 0.5).getHexString()}`; ctx.globalAlpha = 0.15 + 0.6 * v; }
+    ctx.fillRect(x * cell, y * cell, cell, cell);
+  }
+  ctx.globalAlpha = 1;
+  if ($('dots').checked) for (const q of shownSQs()) {
+    const p = q.src === 'dec' ? q.patch : q.q, y = Math.floor(p / GW), x = p % GW;
+    ctx.beginPath(); ctx.arc((x + 0.5) * cell, (y + 0.5) * cell, 3.2, 0, 7);
+    ctx.fillStyle = `#${colorOf(q).getHexString()}`; ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  if (selected) {
+    const p = selected.src === 'dec' ? selected.patch : selected.q, y = Math.floor(p / GW), x = p % GW;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.strokeRect(x * cell - 3, y * cell - 3, cell + 6, cell + 6);
+  }
+}
+cv.addEventListener('click', e => {
+  const r = cv.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * GW), y = Math.floor((e.clientY - r.top) / r.height * GH);
+  const p = y * GW + x, list = shownSQs();
+  selected = list.find(q => (q.src === 'dec' ? q.patch : q.q) === p) || (pred.proposals.find(q => q.q === p) && { ...pred.proposals.find(q => q.q === p), src: 'prop' }) || null;
+  drawSel(); draw2d();
+});
+
+// pick in 3D (click without drag)
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => down = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
+  const hit = ray.intersectObjects(groups.pred.children)[0];
+  selected = hit ? hit.object.userData.q : null;
+  drawSel(); draw2d();
+});
+
+// ---------- ui
+function msg(t) { $('msg').style.display = t ? 'block' : 'none'; $('msg').textContent = t || ''; }
+const KEY = { dense: ['visible', 'recall@0.5', 'best_iou', 'predicted', 'occ_iou', 'occ_iou_topk', 'cls_acc'],
+              topk: ['visible', 'pair_iou', 'found', 'found@0.3', 'predicted', 'predicted@0.3', 'occ_iou@0.3', 'mask_cov', 'cls_acc', 'enc_recall@0.5', 'enc_best_iou', 'enc_predicted'] };
+const fmt = v => typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(3)) : v;
+function tables() {
+  const m = pred?.metrics || {};
+  $('fm').innerHTML = (KEY[pred?.kind] || []).filter(k => k in m).map(k => `<tr><td>${k}</td><td>${fmt(m[k])}</td></tr>`).join('');
+  const rows = Object.entries(summary).map(([r, s]) => {
+    const k = s.kind === 'topk' ? 'pair_iou' : 'best_iou', k2 = s.kind === 'topk' ? 'found@0.3' : 'recall@0.5';
+    return `<tr class="${r === $('run').value ? 'cur' : ''}"><td>${r}</td><td>${fmt(s.seen[k] ?? NaN)} / ${fmt(s.unseen[k] ?? NaN)}</td><td>${fmt(s.seen[k2] ?? NaN)} / ${fmt(s.unseen[k2] ?? NaN)}</td></tr>`;
+  });
+  $('sum').innerHTML = `<tr><th>run</th><th>pair / best IoU</th><th>found@0.3 / recall@0.5</th></tr>${rows.join('')}`;
+}
+async function load() {
+  const run = $('run').value, name = $('frame').value;
+  selected = null;
+  try {
+    [gt, pred] = await Promise.all([getJSON(`/api/gt/${name}`), getJSON(`/api/pred/${run}/${name}`)]);
+    msg('');
+  } catch (e) { gt = pred = null; msg(String(e.message).slice(0, 200)); }
+  rgbImg = new Image(); rgbImg.onload = draw2d; rgbImg.src = `/api/img/${name}/rgb.png`;
+  loadCloud(name);
+  $('seen').innerHTML = pred ? `<span class="tag ${pred.seen ? 'seen' : 'unseen'}">${pred.seen ? 'seen in training' : 'not seen in training'}</span>` : '';
+  const topk = pred?.kind === 'topk';
+  $('predName').textContent = topk ? 'decoder' : 'proposals (top 300 peaks)';
+  $('propWrap').style.display = topk ? '' : 'none';
+  drawGT(); drawPred(); tables();
+}
+function vis() {
+  groups.pts.visible = $('sPts').checked; groups.gt.visible = $('sGt').checked; groups.hid.visible = $('sHid').checked;
+}
+(async () => {
+  resize();
+  classes = await getJSON('/api/classes');
+  const meta = (await getJSON('/api/frames')).meta;
+  try { summary = await getJSON('/api/summary'); } catch { msg('no export found: run code/predict.py'); }
+  $('run').innerHTML = Object.keys(summary).map(r => `<option>${r}</option>`).join('');
+  frames = meta.frames || [];
+  const label = f => f === meta.overfit ? `${f} · overfit` : meta.seen?.f16?.includes(f) ? `${f} · 16 frames` : `${f} · room_0 test`;
+  $('frame').innerHTML = frames.map(f => `<option value="${f}">${label(f)}</option>`).join('');
+  if (summary.f16_topk) { $('run').value = 'f16_topk'; if (meta.seen?.f16?.length) $('frame').value = meta.seen.f16[0]; }
+  for (const id of ['run', 'frame']) $(id).onchange = load;
+  for (const id of ['thr', 'maxN', 'op', 'wire', 'sPred', 'sProp', 'sPeak']) $(id).oninput = drawPred;
+  $('col').onchange = () => { drawGT(); drawPred(); };
+  for (const id of ['sPts', 'sGt', 'sHid']) $(id).onchange = vis;
+  $('ov').onchange = draw2d; $('dots').onchange = draw2d;
+  $('hide2d').onclick = () => { const c = cv.style.display === 'none'; cv.style.display = c ? '' : 'none'; $('hide2d').textContent = c ? 'hide' : 'show'; };
+  $('camBtn').onclick = camView;
+  $('prev').onclick = () => { $('frame').selectedIndex = Math.max(0, $('frame').selectedIndex - 1); load(); };
+  $('next').onclick = () => { $('frame').selectedIndex = Math.min(frames.length - 1, $('frame').selectedIndex + 1); load(); };
+  vis(); await load();
+})();
+</script>
+</body>
+</html>

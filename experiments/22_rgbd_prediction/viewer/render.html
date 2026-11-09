@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projection Renderings</title>
+<style>
+  :root { --bg: #15181d; --panel: #1c2027; --fg: #e6e8eb; --muted: #9aa3ad; --accent: #5aa9ff; --line: #3a414b; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; }
+  #wrap { display: flex; gap: 14px; padding: 12px; align-items: flex-start; }
+  #panel { flex: 0 0 290px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+           position: sticky; top: 12px; max-height: calc(100vh - 50px); overflow-y: auto; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  .row { margin: 9px 0; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  select { width: 100%; }
+  label { display: block; cursor: pointer; }
+  #grid { flex: 1; display: grid; grid-template-columns: auto repeat(3, 1fr); gap: 8px; min-width: 0; }
+  .rowhead { writing-mode: vertical-rl; transform: rotate(180deg); color: var(--muted); font-size: 11px; text-transform: uppercase;
+             letter-spacing: .05em; text-align: center; }
+  .cell { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px; min-width: 0; }
+  .cell .t { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+  .cell canvas { width: 100%; display: block; image-rendering: pixelated; border-radius: 3px; aspect-ratio: 300 / 168; cursor: crosshair; }
+  .cell .x { position: absolute; pointer-events: none; width: 9px; height: 9px; border: 2px solid #fff; border-radius: 50%;
+             box-shadow: 0 0 0 1px #000; transform: translate(-50%, -50%); display: none; }
+  table { width: 100%; border-collapse: collapse; } td { padding: 1px 0; } td:last-child { text-align: right; }
+  #metrics td:not(:first-child) { color: var(--fg); } #metrics th { color: var(--muted); font-weight: normal; text-align: right; }
+  #metrics th:first-child { text-align: left; }
+  #info { color: var(--muted); } #info b { color: var(--fg); }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .note { color: var(--muted); font-size: 11px; margin-top: 10px; }
+  #loading { color: var(--accent); display: none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<div id="panel">
+  <h1>Exp 22: what the projection loss sees</h1>
+  <div class="row"><div class="label">Run (its saved final-eval predictions)</div><select id="run"></select></div>
+  <div class="row"><div class="label">Frame (← →)</div><select id="frame"></select></div>
+  <div class="row"><div class="label">Ray stride</div>
+    <select id="stride"><option value="2">2 px (as in training, 84 × 150)</option><option value="1">1 px (168 × 300)</option><option value="4">4 px (patch grid)</option></select></div>
+  <div class="row"><div class="label">Predicted queries rendered</div>
+    <select id="qset"><option value="train">as in training (existence &gt; 0.02 or matched)</option>
+      <option value="exist05">existence &gt; 0.5 (counted as predicted)</option><option value="matched">matched queries only</option></select></div>
+  <div class="row"><div class="label">Segmentation colored by</div>
+    <select id="seg"><option value="inst">instance (prediction: its matched target's; gray = unmatched)</option>
+      <option value="cls">class</option><option value="sq">SQ / query index</option></select>
+    <label><input type="checkbox" id="dim"> shade by the front SQ's weight</label></div>
+  <div class="row"><div class="label">Third column (renders)</div>
+    <select id="check"><option value="inst">instance agrees with GT</option><option value="cls">class agrees with GT</option>
+      <option value="derr">depth error</option><option value="cover">coverage (sum of weights)</option></select>
+    <div id="legend" class="note"></div></div>
+  <div id="loading">rendering…</div>
+  <div class="row"><div class="label">This frame</div><table id="metrics"></table></div>
+  <div class="row"><div class="label">Pixel under the cursor</div><div id="info">hover over any image</div></div>
+  <div class="note">Rendered as in training: targets with existence 1; predictions (by default) = queries with existence &gt; 0.02 or matched,
+    alpha = existence × soft silhouette. The front SQ is the one with the largest weight; pixels with coverage &lt; 0.5 count as uncovered.</div>
+</div>
+<div id="grid"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const ROWS = [['gt', 'GT'], ['target', 'rendered targets'], ['pred', 'rendered prediction']];
+const COLS = ['seg', 'depth', 'check'];
+const grid = $('grid');
+for (const [r, name] of ROWS) {
+  const h = document.createElement('div'); h.className = 'rowhead'; h.textContent = name; grid.appendChild(h);
+  for (const c of COLS) {
+    const cell = document.createElement('div'); cell.className = 'cell';
+    cell.innerHTML = `<div class="t" id="t_${r}_${c}"></div><canvas id="c_${r}_${c}"></canvas><div class="x" id="x_${r}_${c}"></div>`;
+    grid.appendChild(cell);
+  }
+}
+
+const hsl = (h, s, l) => { // -> [r, g, b] 0..255
+  const a = s * Math.min(l, 1 - l), f = n => { const k = (n + h * 12) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+  return [f(0) * 255, f(8) * 255, f(4) * 255];
+};
+const idColor = (i, off = 0) => i < 0 ? [110, 110, 110] : hsl(((i + off) * 0.618034) % 1, 0.62, 0.56);
+const STOPS = [[48, 18, 59], [70, 107, 227], [41, 187, 236], [49, 241, 150], [163, 253, 61], [237, 208, 58], [251, 128, 34], [204, 44, 4]];
+const turbo = x => { x = Math.min(1, Math.max(0, x)) * (STOPS.length - 1); const i = Math.min(STOPS.length - 2, Math.floor(x)), f = x - i;
+  return [0, 1, 2].map(k => STOPS[i][k] + f * (STOPS[i + 1][k] - STOPS[i][k])); };
+const GREEN = [76, 200, 110], RED = [220, 70, 70], GRAY = [70, 74, 82], BLACK = [0, 0, 0];
+
+let D = null, runs = [], dmax = 1;
+
+function paint(id, w, h, fn) {
+  const cv = $(id); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d'), img = ctx.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) { const c = fn(i); img.data[4 * i] = c[0]; img.data[4 * i + 1] = c[1]; img.data[4 * i + 2] = c[2]; img.data[4 * i + 3] = 255; }
+  ctx.putImageData(img, 0, 0);
+}
+
+function segColor(kind, inst, cls, sq) {
+  const m = $('seg').value;
+  if (m === 'cls') return cls < 0 ? GRAY : idColor(cls, 0.37);
+  if (m === 'sq') return sq < 0 ? GRAY : idColor(sq, 0.11);
+  return inst < 0 ? (sq < 0 ? GRAY : [150, 150, 150]) : idColor(inst);
+}
+
+// GT pixel of render ray k (ray at pixel (v, u) = (stride/2 + s*row, stride/2 + s*col))
+const gtIndex = k => { const [, gw] = D.grid, s = D.stride; return (Math.floor(k / gw) * s + (s >> 1)) * D.W + (k % gw) * s + (s >> 1); };
+
+function draw() {
+  if (!D) return;
+  const { H, W, grid: [gh, gw] } = D;
+  const segName = $('seg').selectedOptions[0].text.split(' (')[0];
+  // GT row
+  paint('c_gt_seg', W, H, i => $('seg').value === 'cls' ? (D.gcls[i] < 0 ? GRAY : idColor(D.gcls[i], 0.37)) : (D.label[i] < 0 ? GRAY : idColor(D.label[i])));
+  $('t_gt_seg').textContent = $('seg').value === 'cls' ? 'GT class' : 'GT instance label';
+  paint('c_gt_depth', W, H, i => D.depth[i] > 0 ? turbo(D.depth[i] / dmax) : BLACK);
+  $('t_gt_depth').textContent = `observed depth (0 – ${dmax.toFixed(1)} m)`;
+  const cv = $('c_gt_check'); cv.width = W; cv.height = H;
+  const im = new Image(); im.onload = () => cv.getContext('2d').drawImage(im, 0, 0); im.src = 'data:image/png;base64,' + D.png;
+  $('t_gt_check').textContent = 'RGB';
+  for (const r of ['target', 'pred']) {
+    const o = D[r], dim = $('dim').checked;
+    paint(`c_${r}_seg`, gw, gh, k => {
+      const sq = o.front[k];
+      let c = sq < 0 ? GRAY : segColor(r, o.inst[k], o.cls[k], r === 'pred' ? o.query[sq] : sq);
+      if (dim && sq >= 0) c = c.map(v => v * (0.25 + 0.75 * o.weight[k]));
+      return c;
+    });
+    $(`t_${r}_seg`).textContent = `front SQ: ${segName}`;
+    paint(`c_${r}_depth`, gw, gh, k => o.front[k] >= 0 ? turbo(o.depth[k] / dmax) : BLACK);
+    $(`t_${r}_depth`).textContent = 'rendered depth';
+    const ch = $('check').value;
+    paint(`c_${r}_check`, gw, gh, k => {
+      const g = gtIndex(k), sq = o.front[k];
+      if (ch === 'cover') return turbo(o.cover[k]);
+      if (ch === 'derr') {
+        if (sq < 0 || D.depth[g] <= 0) return GRAY;
+        const e = (o.depth[k] - D.depth[g]) / D.depth[g];  // signed: red = too far, blue = too close
+        const a = Math.min(1, Math.abs(e) / 0.2);
+        return e > 0 ? [60 + 190 * a, 60, 60] : [60, 60 + 60 * a, 60 + 190 * a];
+      }
+      const gl = ch === 'inst' ? D.label[g] : D.gcls[g], pl = ch === 'inst' ? o.inst[k] : o.cls[k];
+      if (gl < 0) return BLACK;
+      if (sq < 0) return GRAY;
+      return pl === gl ? GREEN : RED;
+    });
+    $(`t_${r}_check`).textContent = { inst: 'instance agrees with GT', cls: 'class agrees with GT', derr: 'depth error (rendered − observed)', cover: 'coverage' }[ch];
+  }
+  const sw = c => `<span class="sw" style="background:rgb(${c})"></span>`;
+  $('legend').innerHTML = { inst: `${sw(GREEN)}agrees ${sw(RED)}wrong ${sw(GRAY)}uncovered ${sw(BLACK)}unlabelled`,
+    cls: `${sw(GREEN)}agrees ${sw(RED)}wrong ${sw(GRAY)}uncovered ${sw(BLACK)}unlabelled`,
+    derr: `${sw([250, 60, 60])}too far ${sw([60, 120, 250])}too close (saturates at 20 %) ${sw(GRAY)}no depth / uncovered`,
+    cover: 'turbo map, 0 (dark) – 1 (red)' }[$('check').value];
+  const f = x => x == null ? '–' : (+x).toFixed(3), mt = D.target.metrics, mp = D.pred.metrics;
+  $('metrics').innerHTML = `<tr><th></th><th>targets</th><th>prediction</th></tr>
+    <tr><td>SQs rendered</td><td>${mt.sqs}</td><td>${mp.sqs}</td></tr>
+    <tr><td>labelled pixels covered</td><td>${f(mt.cover)}</td><td>${f(mp.cover)}</td></tr>
+    <tr><td>instance accuracy</td><td>${f(mt.inst_acc)}</td><td>${f(mp.inst_acc)}</td></tr>
+    <tr><td>class accuracy</td><td>${f(mt.cls_acc)}</td><td>${f(mp.cls_acc)}</td></tr>
+    <tr><td>depth abs rel</td><td>${f(mt.depth_absrel)}</td><td>${f(mp.depth_absrel)}</td></tr>`;
+}
+
+function hover(e) {
+  if (!D) return;
+  const r = e.target.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+  for (const [row] of ROWS) for (const c of COLS) {
+    const x = $(`x_${row}_${c}`), cv = $(`c_${row}_${c}`), cr = cv.getBoundingClientRect(), pr = cv.parentElement.getBoundingClientRect();
+    x.style.display = 'block'; x.style.left = (cr.left - pr.left + fx * cr.width) + 'px'; x.style.top = (cr.top - pr.top + fy * cr.height) + 'px';
+  }
+  const [gh, gw] = D.grid, k = Math.min(gh - 1, Math.floor(fy * gh)) * gw + Math.min(gw - 1, Math.floor(fx * gw)), g = gtIndex(k);
+  const cn = c => c < 0 ? '–' : D.classes[c], f = x => (+x).toFixed(2);
+  const t = D.target, p = D.pred, ts = t.front[k], ps = p.front[k];
+  $('info').innerHTML = `<b>GT</b>: instance ${D.label[g]}, ${cn(D.gcls[g])}, depth ${f(D.depth[g])} m<br>
+    <b>targets</b>: ${ts < 0 ? 'uncovered' : `SQ ${ts} (instance ${t.inst[k]}, ${cn(t.cls[k])}), weight ${f(t.weight[k])}`}, coverage ${f(t.cover[k])}${ts < 0 ? '' : `, depth ${f(t.depth[k])} m`}<br>
+    <b>prediction</b>: ${ps < 0 ? 'uncovered' : `query ${p.query[ps]} (exist ${f(p.exist[ps])}, ${p.inst[k] < 0 ? 'unmatched' : 'instance ' + p.inst[k]}, ${cn(p.cls[k])}), weight ${f(p.weight[k])}`}, coverage ${f(p.cover[k])}${ps < 0 ? '' : `, depth ${f(p.depth[k])} m`}`;
+}
+
+async function load() {
+  $('loading').style.display = 'block';
+  D = await fetch(`api/render/${$('run').value}/${$('frame').value}?stride=${$('stride').value}&qset=${$('qset').value}`).then(r => r.json());
+  $('loading').style.display = 'none';
+  dmax = Math.max(1, ...D.depth);
+  draw();
+}
+
+function fillFrames() {
+  const r = runs.find(x => x.run === $('run').value);
+  $('frame').innerHTML = r.frames.map(f => `<option>${f}</option>`).join('');
+}
+
+grid.addEventListener('mousemove', e => { if (e.target.tagName === 'CANVAS') hover(e); });
+['seg', 'check', 'dim'].forEach(id => $(id).addEventListener('input', draw));
+$('stride').addEventListener('change', load);
+$('qset').addEventListener('change', load);
+$('frame').addEventListener('change', load);
+$('run').addEventListener('change', () => { fillFrames(); load(); });
+addEventListener('keydown', e => {
+  const s = $('frame'), d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  if (!d) return;
+  s.selectedIndex = Math.max(0, Math.min(s.options.length - 1, s.selectedIndex + d));
+  load();
+});
+
+(async () => {
+  runs = await fetch('api/render/runs').then(r => r.json());
+  $('run').innerHTML = runs.map(r => `<option>${r.run}</option>`).join('');
+  const pref = runs.find(r => r.run.startsWith('f16s_r')) || runs[0];
+  $('run').value = pref.run;
+  fillFrames();
+  load();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+{
+ "args": {
+  "name": "of_patch_sqmask",
+  "epochs": 375,
+  "batch": 8,
+  "lr": 0.0001,
+  "queries": 200,
+  "eval_every": 75,
+  "patch_queries": true,
+  "loss": "cd",
+  "mask": "sq",
+  "overfit": "room_2_000500"
+ },
+ "test": {
+  "targets": 112.0,
+  "predicted": 108.0,
+  "cd": 0.028655441477894783,
+  "pair_iou": 0.7534850835800171,
+  "cls_acc": 1.0,
+  "sq_mask_iou": 0.4769035279750824,
+  "occ_iou": 0.5610098242759705,
+  "found": 0.9642857313156128,
+  "occ_iou@0.3": 0.6813725233078003,
+  "found@0.3": 0.9910714626312256,
+  "predicted@0.3": 113.0,
+  "mask_cov": 0.5153948341242292,
+  "instances_pred": 21.0,
+  "instances_gt": 22.0
+ },
+ "train_eval": {
+  "targets": 112.0,
+  "predicted": 108.0,
+  "cd": 0.028655441477894783,
+  "pair_iou": 0.7601798176765442,
+  "cls_acc": 1.0,
+  "sq_mask_iou": 0.4769035279750824,
+  "occ_iou": 0.5514593124389648,
+  "found": 0.9642857313156128,
+  "occ_iou@0.3": 0.6466666460037231,
+  "found@0.3": 0.9910714626312256,
+  "predicted@0.3": 113.0,
+  "mask_cov": 0.5153948341242292,
+  "instances_pred": 21.0,
+  "instances_gt": 22.0
+ },
+ "per_frame": [
+  {
+   "name": "room_2_000500",
+   "targets": 112,
+   "predicted": 108,
+   "cd": 0.028655441477894783,
+   "pair_iou": 0.7534850835800171,
+   "cls_acc": 1.0,
+   "sq_mask_iou": 0.4769035279750824,
+   "occ_iou": 0.5610098242759705,
+   "found": 0.9642857313156128,
+   "occ_iou@0.3": 0.6813725233078003,
+   "found@0.3": 0.9910714626312256,
+   "predicted@0.3": 113,
+   "mask_cov": 0.5153948341242292,
+   "instances_pred": 21,
+   "instances_gt": 22
+  }
+ ]
+}

@@ -1,0 +1,60 @@
+{
+ "args": {
+  "name": "of_dense_heat",
+  "epochs": 375,
+  "batch": 8,
+  "lr": 0.0001,
+  "queries": 200,
+  "eval_every": 75,
+  "patch_queries": false,
+  "loss": "cd",
+  "mask": "instance",
+  "two_stage": false,
+  "select": 300,
+  "dense": true,
+  "layers": 1,
+  "topk": false,
+  "dec_layers": 1,
+  "frames": null,
+  "overfit": "room_2_000500"
+ },
+ "test": {
+  "targets": 112.0,
+  "visible": 68.0,
+  "recall@0.5": 0.6176470518112183,
+  "best_iou": 0.5045429468154907,
+  "exist_precision": 1.0,
+  "exist_recall": 0.03575989603996277,
+  "predicted": 112.0,
+  "occ_iou_topk": 0.29049211740493774,
+  "occ_iou": 0.5740561485290527,
+  "cls_acc": 0.9974457025527954
+ },
+ "train_eval": {
+  "targets": 112.0,
+  "visible": 68.0,
+  "recall@0.5": 0.6176470518112183,
+  "best_iou": 0.5045429468154907,
+  "exist_precision": 1.0,
+  "exist_recall": 0.03575989603996277,
+  "predicted": 112.0,
+  "occ_iou_topk": 0.29049211740493774,
+  "occ_iou": 0.5740561485290527,
+  "cls_acc": 0.9974457025527954
+ },
+ "per_frame": [
+  {
+   "targets": 112,
+   "visible": 68,
+   "recall@0.5": 0.6176470518112183,
+   "best_iou": 0.5045429468154907,
+   "exist_precision": 1.0,
+   "exist_recall": 0.03575989603996277,
+   "predicted": 112,
+   "occ_iou_topk": 0.29049211740493774,
+   "occ_iou": 0.5740561485290527,
+   "cls_acc": 0.9974457025527954,
+   "name": "room_2_000500"
+  }
+ ]
+}

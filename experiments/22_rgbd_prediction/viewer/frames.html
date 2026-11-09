@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RGBD Frame Predictions</title>
+<style>
+  :root { --bg: #15181d; --panel: rgba(28, 32, 39, 0.94); --fg: #e6e8eb; --muted: #9aa3ad; --accent: #5aa9ff; --line: #3a414b; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  #panel { position: absolute; top: 12px; left: 12px; width: 280px; background: var(--panel); border: 1px solid var(--line);
+           border-radius: 8px; padding: 12px 14px; max-height: calc(100% - 50px); overflow-y: auto; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  .row { margin: 8px 0; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  select, input[type=range] { width: 100%; }
+  label { display: block; cursor: pointer; }
+  #metrics, #info { color: var(--muted); margin-top: 8px; }
+  #metrics table { width: 100%; border-collapse: collapse; } #metrics td:last-child { text-align: right; color: var(--fg); }
+  #view { position: absolute; right: 12px; bottom: 12px; width: min(46vw, 600px); background: var(--panel);
+          border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  #view .frame { position: relative; }
+  #view img, #view canvas { width: 100%; display: block; border-radius: 4px; image-rendering: pixelated; }
+  #view canvas { position: absolute; inset: 0; height: 100%; opacity: 0.55; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Exp 22: single-frame SQ prediction</h1>
+  <div class="row"><div class="label">Run</div><select id="run"></select></div>
+  <div class="row"><div class="label">Test frame, sorted by occupancy IoU (keys ← →)</div><select id="frame"></select></div>
+  <div class="row"><div class="label">Show</div>
+    <label><input type="checkbox" id="showPred" checked> predicted SQs (exist &gt; 0.5)</label>
+    <label><input type="checkbox" id="showTgt"> target SQs</label>
+    <label><input type="checkbox" id="showPts" checked> depth points</label>
+  </div>
+  <div class="row"><div class="label">Color SQs by</div>
+    <select id="colorBy"><option value="inst">instance (prediction: of its matched target; gray = unmatched)</option>
+      <option value="sq">SQ</option></select></div>
+  <div class="row"><div class="label">SQ opacity</div><input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.85"></div>
+  <div class="row"><div class="label">Image overlay</div>
+    <select id="overlay"><option value="pred">predicted instances</option><option value="gt">GT instances</option><option value="">none</option></select></div>
+  <div id="metrics"></div>
+  <div id="info">click an SQ for its class</div>
+</div>
+<div id="view"><div class="frame"><img id="img" alt="frame"><canvas id="mask" width="75" height="42"></canvas></div></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const $ = id => document.getElementById(id);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15181d);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.02, 100);
+camera.up.set(0, -1, 0);  // camera frame: y down
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+sun.position.set(1, -3, -2);
+scene.add(sun);
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+const color = i => i < 0 ? new THREE.Color(0x777777) : new THREE.Color().setHSL((i * 0.618034) % 1, 0.6, 0.55);
+let layers = {}, meta = null, frames = [], run = null;
+
+function sqMesh(buf, at, [nv, nf], inst) {
+  if (!nv) return [null, at];
+  const V = new Float32Array(buf.slice(at, at + nv * 12)); at += nv * 12;
+  const F = new Uint32Array(buf.slice(at, at + nf * 12)); at += nf * 12;
+  const S = new Uint16Array(buf.slice(at, at + nv * 2)); at += nv * 2;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(V, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
+  g.setIndex(new THREE.BufferAttribute(F, 1));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8, transparent: true }));
+  m.userData = { S, inst };
+  return [m, at];
+}
+
+function colorSq(m) {
+  if (!m) return;
+  const { S, inst } = m.userData, a = m.geometry.attributes.color, bySq = $('colorBy').value === 'sq';
+  for (let i = 0; i < S.length; i++) {
+    const c = color(bySq ? S[i] : inst[S[i]]);
+    a.array[3 * i] = c.r; a.array[3 * i + 1] = c.g; a.array[3 * i + 2] = c.b;
+  }
+  a.needsUpdate = true;
+}
+
+function drawMask() {
+  const cv = $('mask'), ctx = cv.getContext('2d'), img = ctx.createImageData(75, 42), which = $('overlay').value;
+  if (which && layers.masks) {
+    const m = layers.masks[which];
+    for (let i = 0; i < m.length; i++) {
+      if (m[i] < 0) continue;
+      const c = color(which === 'gt' ? m[i] : m[i] * 7 + 3);
+      img.data.set([c.r * 255, c.g * 255, c.b * 255, 255], 4 * i);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function update() {
+  if (layers.pred) { layers.pred.visible = $('showPred').checked; layers.pred.material.opacity = +$('opacity').value; }
+  if (layers.tgt) { layers.tgt.visible = $('showTgt').checked; layers.tgt.material.opacity = +$('opacity').value; }
+  if (layers.pts) layers.pts.visible = $('showPts').checked;
+}
+
+async function loadFrame(name, keepView) {
+  const base = `data/frames/${run}/${name}`;
+  const [m, buf] = await Promise.all([fetch(base + '.json').then(r => r.json()), fetch(base + '.bin').then(r => r.arrayBuffer())]);
+  for (const k of ['pred', 'tgt', 'pts']) if (layers[k]) { scene.remove(layers[k]); layers[k].geometry.dispose(); }
+  meta = m;
+  const n = m.points;
+  let at = 0;
+  const xyz = new Float32Array(buf.slice(0, n * 12)); at = n * 12;
+  const rgb = new Uint8Array(buf.slice(at, at + n * 3)); at += n * 3;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(xyz, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(Float32Array.from(rgb, v => Math.pow(v / 255, 2.2)), 3));
+  layers.pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.012, vertexColors: true }));
+  [layers.pred, at] = sqMesh(buf, at, m.pred_mesh, m.pred_inst);
+  [layers.tgt, at] = sqMesh(buf, at, m.target_mesh, m.target_inst);
+  layers.masks = { pred: new Int16Array(buf.slice(at, at + 42 * 75 * 2)), gt: new Int16Array(buf.slice(at + 42 * 75 * 2, at + 42 * 75 * 4)) };
+  for (const k of ['pred', 'tgt', 'pts']) if (layers[k]) scene.add(layers[k]);
+  colorSq(layers.pred); colorSq(layers.tgt);
+  if (!keepView) {
+    const box = new THREE.Box3().setFromBufferAttribute(xyz.length ? g.attributes.position : new THREE.BufferAttribute(new Float32Array([0, 0, 3]), 3));
+    const c = box.getCenter(new THREE.Vector3());
+    controls.target.copy(c);
+    camera.position.set(0, -0.3, -0.8);  // behind the original camera, slightly above
+  }
+  $('img').src = base + '.png';
+  drawMask();
+  const f = v => v == null ? '–' : (+v).toFixed(3);
+  $('metrics').innerHTML = `<table><tr><td>occupancy IoU</td><td>${f(m.occ_iou)}</td></tr><tr><td>matched Chamfer (m)</td><td>${f(m.cd)}</td></tr>
+    <tr><td>mask coverage</td><td>${f(m.mask_cov)}</td></tr><tr><td>targets found (exist &gt; 0.5)</td><td>${f(m.found)}</td></tr>
+    <tr><td>class accuracy</td><td>${f(m.cls_acc)}</td></tr><tr><td>SQs predicted / targets</td><td>${m.predicted} / ${m.targets}</td></tr></table>`;
+  update();
+}
+
+async function loadRun(r) {
+  run = r;
+  const idx = await fetch(`data/frames/${r}/index.json`).then(x => x.json());
+  frames = [...idx.frames].sort((a, b) => (b.occ_iou ?? 0) - (a.occ_iou ?? 0));
+  $('frame').innerHTML = frames.map(f => `<option value="${f.name}">${f.name} · IoU ${(f.occ_iou ?? 0).toFixed(2)}</option>`).join('');
+  loadFrame(frames[0].name);
+}
+
+['showPred', 'showTgt', 'showPts', 'opacity'].forEach(id => $(id).addEventListener('input', update));
+$('colorBy').addEventListener('input', () => { colorSq(layers.pred); colorSq(layers.tgt); });
+$('overlay').addEventListener('input', drawMask);
+$('frame').addEventListener('change', e => loadFrame(e.target.value, true));
+$('run').addEventListener('change', e => loadRun(e.target.value));
+addEventListener('keydown', e => {
+  const s = $('frame'), d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  if (!d) return;
+  s.selectedIndex = Math.max(0, Math.min(s.options.length - 1, s.selectedIndex + d));
+  loadFrame(s.value, true);
+});
+
+const ray = new THREE.Raycaster(), down = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', e => down.set(e.clientX, e.clientY));
+renderer.domElement.addEventListener('click', e => {
+  if (down.distanceTo(new THREE.Vector2(e.clientX, e.clientY)) > 4) return;
+  ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1), camera);
+  const objs = ['pred', 'tgt'].filter(k => layers[k] && layers[k].visible).map(k => layers[k]);
+  const hit = ray.intersectObjects(objs)[0];
+  if (!hit) return;
+  const isPred = hit.object === layers.pred, s = hit.object.userData.S[hit.face.a];
+  $('info').innerHTML = isPred ? `<b>predicted SQ ${s}</b>: ${meta.pred_cls[s]}, exist ${meta.pred_exist[s]}, matched instance ${meta.pred_inst[s]}`
+                               : `<b>target SQ ${s}</b>: ${meta.target_cls[s]}, instance ${meta.target_inst[s]}`;
+});
+
+const runs = await fetch('data/frames/runs.json').then(r => r.json());
+$('run').innerHTML = runs.map(r => `<option>${r}</option>`).join('');
+loadRun(runs[runs.length - 1]);
+</script>
+</body>
+</html>

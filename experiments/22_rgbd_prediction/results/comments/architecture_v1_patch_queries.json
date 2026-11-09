@@ -1,0 +1,188 @@
+[
+ {
+  "section": "overview",
+  "quote": "new DecoderLayer ×3 (shared)",
+  "text": "Is the head only applied to the final layer?\nMaybe later on it would make sense to introduce DeformableDETR like layer-wise predictions + loss and each layer only refining the predictions of the previous ones",
+  "author": "Sebastian",
+  "id": "b7791482",
+  "created": "2026-11-06 10:17",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Yes: in both the patch pass and the two-stage decoder, the heads only see the output of the last layer, and only that output gets a loss.\nAgreed that layer-wise predictions with an auxiliary loss per layer, each layer refining the previous SQ (translation += Δ, log-scale += Δ, …), are the standard fix (DETR aux loss, Deformable DETR \"iterative box refinement\"). Two caveats:\n- It argues for unsharing the layer weights. Today it is one layer used 3×, so every layer would have to do \"refinement step k\" with the same weights.\n- Each auxiliary layer needs its own Hungarian matching. On 3150 patch queries that is costly (matching is already our bottleneck); on the 300 two-stage queries it is fine.\nI'd add it once the matching question (1 vs 16 frames) is settled, together with a bigger decoder.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   },
+   {
+    "text": "For now, don't add it but keep it in mind later. I believe this is the biggest advantage of a 2 stage encoder-decoder",
+    "author": "Sebastian",
+    "created": "2026-11-06 10:32"
+   }
+  ]
+ },
+ {
+  "section": "inputs",
+  "quote": "",
+  "text": "I believe I still need to sanity check both image and point features. Maybe a small viewer with RGB projected coloring",
+  "author": "Sebastian",
+  "id": "ddfb7763",
+  "created": "2026-11-06 10:18",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Agreed, nobody has looked at these features yet. Proposal for a small viewer (one test frame at a time):\n- RGB next to the depth point cloud, colored by a PCA (to 3 dims) of (a) the DINO patch token of each pixel's patch, (b) its Sonata feature (1088), (c) the learned tokenizer output (128) of a trained run;\n- plus the patch anchors and the normals used as Sonata input.\nIf the PCA colors separate objects and parts in (a) and (b), the inputs are fine. Similar to what exp 04 did for Sonata on whole scenes. About 30 min of work. Shall I build it?",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ },
+ {
+  "section": "inputs",
+  "quote": "moved to the world frame",
+  "text": "Maybe this might be a problem? I.e. the features encoded are in a different frame than the predictions? \nProbably not a big one, but maybe also sanity ablate this one",
+  "author": "Sebastian",
+  "id": "94d8a436",
+  "created": "2026-11-06 10:19",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "It's a real point, more for the multi-frame case than for single frames. Sonata itself should get world z-up input: it was trained gravity-aligned, and rotated input would be out of distribution. Its features are descriptors (floor-like, chair-leg-like…), not coordinates, but they are orientation-aware in world terms. The heads predict in the camera frame, and the camera's tilt is never given to the model; it has to infer it implicitly. For one frame that is a constant and gets memorized. Across frames, \"up\" is a different camera-frame direction in every frame, so features like \"upward normal\" map to different predicted rotations.\nOptions:\n1. Predict in a gravity-aligned camera frame (camera yaw and position only, z up). Realistic, since any RGB-D device has an IMU. My preference.\n2. Feed gravity (in camera coords) as an input token.\n3. The ablation you suggest: Sonata on camera-frame points. I'd expect it to be worse, but it is cheap with the cache script.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   },
+   {
+    "text": "Okay, I think this should not be our piority for now. It is probably not important,let's leave it",
+    "author": "Sebastian",
+    "created": "2026-11-06 10:35"
+   }
+  ]
+ },
+ {
+  "section": "data",
+  "quote": "hat intersect the camera frustum: at least one mesh vertex projects into the kept image with z > 0.1 m.",
+  "text": "I feel like this might also still be a big issue. We will need to find a cleaner selection and parametrization of targets.\nBut this can't explain the  underfitting currently right?\n\nSince the overfits still work...",
+  "author": "Sebastian",
+  "id": "654d389c",
+  "created": "2026-11-06 10:21",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Agreed on both. It can't explain why one frame fits, but it can explain part of why many frames don't. In one frame any target set can be memorized. Across frames the model has to learn the *rule*:\n- \"one mesh vertex inside the frustum\" makes SQs pop in and out between neighbouring frames with nearly the same image;\n- the 20–35 % hidden-instance targets can't be inferred from the image at all.\nBoth are inconsistent supervision for the same input, which is exactly what fails beyond memorization.\nCheap test: 16 frames with only the SQs of visible instances (≥ N pixels) as targets. If that fits much better, the target definition is a main cause.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ },
+ {
+  "section": "tokenizer",
+  "quote": "",
+  "text": "I belive the tokenize is too bloated in comparison to the decoder where the actual magic should happen",
+  "author": "Sebastian",
+  "id": "eb2f88a5",
+  "created": "2026-11-06 10:22",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Partly agree. Parameter-wise the tokenizer is 609 k against 298 k in the decoder, but most of that is the unavoidable input projections (DINO 1024→256: 262 k, Sonata 1088→128: 139 k) plus the fuse MLP (164 k). The real issue is in the decoder: d = 128, 1 head, one shared layer. I'd simplify the tokenizer (see the max-pool comment below) and grow the decoder (d 256, 8 heads, 6 unshared layers, ~5 M), rather than shrink the tokenizer further.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ },
+ {
+  "section": "tokenizer",
+  "quote": "Lin(192→128) + Lin(384→128) + Lin(512→128) on each stage's tokens, gathered per pixel and summed (= one Linear on the concatenated 1088), then GELU → Linear(128→64); pixels without depth get a zero row",
+  "text": "What about a maxpool patch-wise on the 1088 features, then the Linear->128 on the Bx42x75?",
+  "author": "Sebastian",
+  "id": "9f2b2293",
+  "created": "2026-11-06 10:24",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Good point, and with the numbers it's nearly lossless. Median depth is 2.4 m, so a patch (4×4 pixels at /4) covers about 6 cm. Sonata's kept stages are much coarser (about 8, 16 and 32 cm voxels), so the 16 pixels of a patch mostly carry the *same* Sonata tokens. Max-pooling the 1088 per patch and then Linear → 128 loses almost nothing; the per-pixel MLP before pooling buys little. It's also faster and simpler. I'd adopt it together with removing the point MLP (see there).",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ },
+ {
+  "section": "tokenizer",
+  "quote": "invalid pixels",
+  "text": "What are invalid pixels in this context?",
+  "author": "Sebastian",
+  "id": "9524bdd1",
+  "created": "2026-11-06 10:25",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Pixels without depth (depth = 0). In Replica renders they are rare: on average 0.3 % of the pixels (max 8.5 % in one frame), mostly at holes in the mesh. Only 0.3 % of patches are partially valid. The masking machinery therefore matters almost never; it only guards against NaNs and makes depth-less patches use a ray anchor at 3 m. With real sensors (glass, dark or far surfaces) it would matter much more.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ },
+ {
+  "section": "tokenizer",
+  "quote": "pooling",
+  "text": "Could you explain this in more depth? Why not a simple max pool?",
+  "author": "Sebastian",
+  "id": "5ac538a8",
+  "created": "2026-11-06 10:26",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Per patch there are 16 per-pixel feature vectors (128-d each, after the point MLP). Pooling makes one vector out of them, independent of their order (PointNet-style):\n- max: per channel, the largest value over the 16 pixels. It answers \"does any pixel show feature k?\", which is good for detecting a thin structure or an edge in a patch. But only the argmax pixel receives gradient.\n- mean: the average. Smooth, robust to one outlier pixel, and every pixel gets gradient.\nBoth are concatenated (256). Invalid pixels are excluded from both (−1e4 before max, weight 0 in the mean).\nA simple max pool would be fine; it's the PointNet default. With Sonata features nearly constant within a patch (previous thread), the choice hardly matters.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ },
+ {
+  "section": "tokenizer",
+  "quote": "point MLP",
+  "text": "Explain what happens here pls",
+  "author": "Sebastian",
+  "id": "b5cf8a6e",
+  "created": "2026-11-06 10:26",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Each of the 16 pixels of a patch becomes one input vector:\n[its Sonata feature compressed to 64-d, its 3D point (camera frame) minus the patch centroid].\nSo the vector says \"what Sonata sees here, and where this pixel lies relative to the patch's center (offsets of a few cm)\". The same MLP (67 → 128 → GELU → 128) maps each of the 16 vectors independently; then they are pooled. It's a tiny PointNet over the patch's 16 back-projected points. In principle it can encode local geometry: planar vs edge vs depth jump (e.g. a patch straddling a table edge and the floor behind has large z offsets).\nHonestly: DINO and Sonata likely already encode most of this. If we max-pool the 1088 directly, I'd keep only cheap explicit geometry per patch (centroid, normal, depth spread / std of z) instead of this MLP.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ },
+ {
+  "section": "tokenizer",
+  "quote": "valid share 1",
+  "text": "Why not valid count?",
+  "author": "Sebastian",
+  "id": "cce8c990",
+  "created": "2026-11-06 10:26",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "It is the valid count: share = count / 16. Dividing keeps the input in [0, 1], next to the other normalized inputs. Same information, so no difference.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ },
+ {
+  "section": "tokenizer",
+  "quote": "+ Linear of Fourier(centroid, 8 freqs, period 16 m) ‖ Fourier(grid uv ∈ [0,1], 6 freqs)",
+  "text": "Is this a standard 2D embedding?",
+  "author": "Sebastian",
+  "id": "d3a7ac8b",
+  "created": "2026-11-06 10:28",
+  "resolved": false,
+  "replies": [
+   {
+    "text": "Standard Fourier / NeRF-style features: sin and cos of x · 2^i · π / scale per coordinate, then one Linear, added to the token.\n- grid (u, v ∈ [0, 1], 6 frequencies): periods 2 … 1/16 of the image, so the finest resolves about 2 patches. This is close to the 2D sin-cos embedding of MAE / ViTDet (geometric frequencies), but with fewer frequencies and a learned projection. It's largely redundant: DINOv3 tokens already contain their position (RoPE inside the ViT).\n- centroid (x, y, z in camera frame, 8 frequencies, period 16 m down to 12.5 cm): the patch's 3D position, which a 2D embedding doesn't have.\nI'd keep the 3D one and could drop the 2D one.",
+    "author": "Claude",
+    "created": "2026-11-06 10:29"
+   }
+  ]
+ }
+]

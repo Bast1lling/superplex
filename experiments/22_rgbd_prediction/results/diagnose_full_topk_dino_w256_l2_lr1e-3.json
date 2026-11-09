@@ -1,0 +1,120 @@
+{
+ "train": {
+  "iou": 0.4673943662657468,
+  "iou_gt_trans": 0.6271261164587677,
+  "iou_gt_shape": 0.5333911680454637,
+  "dt_rel": 0.23853826817852336,
+  "cls_ok": 0.9992690058479532,
+  "best_proposal": 0.4969441008026763,
+  "in_select": 0.8005512402906539,
+  "center_above_kth": 1.0,
+  "dt_median_m": 0.038054220378398895,
+  "proposal_recall@0.5_oracle": 0.5148635477582846,
+  "iou_patches_1-2": 0.292832738499446,
+  "iou_patches_3-16": 0.4795478352841771,
+  "iou_patches_17-1000000": 0.6478464137119657,
+  "f_0-0.25: share / iou / iou_gt_trans / dt_rel / in_select": [
+   0.186,
+   0.46,
+   0.633,
+   0.068,
+   0.867
+  ],
+  "f_0.25-0.5: share / iou / iou_gt_trans / dt_rel / in_select": [
+   0.224,
+   0.509,
+   0.661,
+   0.069,
+   0.854
+  ],
+  "f_0.5-0.75: share / iou / iou_gt_trans / dt_rel / in_select": [
+   0.193,
+   0.505,
+   0.653,
+   0.105,
+   0.803
+  ],
+  "f_0.75-1: share / iou / iou_gt_trans / dt_rel / in_select": [
+   0.397,
+   0.429,
+   0.593,
+   0.206,
+   0.737
+  ],
+  "patches_1-2: share / in_select / best_proposal": [
+   0.368,
+   0.585,
+   0.145
+  ],
+  "patches_3-16: share / in_select / best_proposal": [
+   0.23,
+   0.827,
+   0.546
+  ],
+  "patches_17-1000000: share / in_select / best_proposal": [
+   0.374,
+   0.997,
+   0.813
+  ]
+ },
+ "test": {
+  "iou": 0.10439459902606892,
+  "iou_gt_trans": 0.23310576295469554,
+  "iou_gt_shape": 0.1364728594525516,
+  "dt_rel": 1.1193242536659558,
+  "cls_ok": 0.6496189917936694,
+  "best_proposal": 0.18459379764328276,
+  "in_select": 0.6388180590970451,
+  "center_above_kth": 0.9872506374681266,
+  "dt_median_m": 0.24514688551425934,
+  "proposal_recall@0.5_oracle": 0.08323563892145369,
+  "iou_patches_1-2": 0.03158610159213133,
+  "iou_patches_3-16": 0.10392126420835959,
+  "iou_patches_17-1000000": 0.18859118373628947,
+  "f_0-0.25: share / iou / iou_gt_trans / dt_rel / in_select": [
+   0.121,
+   0.083,
+   0.197,
+   0.541,
+   0.65
+  ],
+  "f_0.25-0.5: share / iou / iou_gt_trans / dt_rel / in_select": [
+   0.223,
+   0.126,
+   0.247,
+   0.389,
+   0.679
+  ],
+  "f_0.5-0.75: share / iou / iou_gt_trans / dt_rel / in_select": [
+   0.183,
+   0.111,
+   0.232,
+   0.61,
+   0.614
+  ],
+  "f_0.75-1: share / iou / iou_gt_trans / dt_rel / in_select": [
+   0.472,
+   0.097,
+   0.236,
+   0.609,
+   0.626
+  ],
+  "patches_1-2: share / in_select / best_proposal": [
+   0.368,
+   0.255,
+   0.038
+  ],
+  "patches_3-16: share / in_select / best_proposal": [
+   0.268,
+   0.721,
+   0.189
+  ],
+  "patches_17-1000000: share / in_select / best_proposal": [
+   0.341,
+   0.989,
+   0.34
+  ],
+  "unseen_class_share": 0.04616060961313013,
+  "iou_unseen_class": 0.05259787733075283
+ }
+}

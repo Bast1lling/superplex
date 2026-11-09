@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Predictor Architecture (old)</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --fg: #1d2127; --muted: #5f6873; --line: #dfe2e6; --accent: #2f6fd6;
+    --img: #e2ecfb; --img-s: #2f6fd6; --geo: #e3f4e8; --geo-s: #2e8b57; --tok: #f6ecdd; --tok-s: #b7791f;
+    --dec: #efe7f8; --dec-s: #7b4fc4; --head: #fbe5e5; --head-s: #c2413b; --frozen: #eceff2; --frozen-s: #7a828c;
+    --warn: #fff4d6; --warn-s: #b88a00; --code: #f0f1f3;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff;
+    --img: #1b2a44; --img-s: #6aa8ff; --geo: #17322a; --geo-s: #5cc78d; --tok: #3a2e1b; --tok-s: #e0a64a;
+    --dec: #2c2340; --dec-s: #ae8cf0; --head: #3d2023; --head-s: #f07b74; --frozen: #262b33; --frozen-s: #9aa3ad;
+    --warn: #3a3218; --warn-s: #e3c04f; --code: #262b33;
+  } }
+  :root[data-theme="dark"] {
+    --bg: #15181d; --panel: #1d2128; --fg: #e6e8eb; --muted: #9aa3ad; --line: #343a43; --accent: #6aa8ff;
+    --img: #1b2a44; --img-s: #6aa8ff; --geo: #17322a; --geo-s: #5cc78d; --tok: #3a2e1b; --tok-s: #e0a64a;
+    --dec: #2c2340; --dec-s: #ae8cf0; --head: #3d2023; --head-s: #f07b74; --frozen: #262b33; --frozen-s: #9aa3ad;
+    --warn: #3a3218; --warn-s: #e3c04f; --code: #262b33;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+  nav { position: sticky; top: 16px; align-self: start; font-size: 13px; }
+  nav a { display: block; color: var(--muted); text-decoration: none; padding: 3px 0 3px 10px; border-left: 2px solid var(--line); }
+  nav a:hover { color: var(--accent); border-color: var(--accent); }
+  nav .t { font-weight: 600; color: var(--fg); margin-bottom: 8px; }
+  main { min-width: 0; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 44px 0 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 22px 0 6px; }
+  p, li { max-width: 78ch; }
+  .sub { color: var(--muted); margin: 0 0 18px; }
+  code, .m { font: 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  pre { font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .tbl { overflow-x: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 12px 0; }
+  .warn { background: var(--warn); border-left: 4px solid var(--warn-s); border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 14px 0; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  .kpi .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--muted); font-size: 12px; }
+  .tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 10px; border: 1px solid; margin-left: 6px; vertical-align: 2px; }
+  .tag.frozen { color: var(--frozen-s); border-color: var(--frozen-s); }
+  .tag.train { color: var(--geo-s); border-color: var(--geo-s); }
+  .tag.new { color: var(--dec-s); border-color: var(--dec-s); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { fill: var(--fg); font: 12px system-ui, sans-serif; }
+  svg .mut { fill: var(--muted); font-size: 11px; }
+  svg .b { font-weight: 600; }
+  .suspect { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; }
+  .suspect h3 { margin: 0 0 4px; }
+  .suspect .ev { color: var(--muted); font-size: 14px; }
+  .rank { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px;
+          background: var(--head-s); color: #fff; font-size: 12px; font-weight: 700; margin-right: 8px; }
+  .rank.m { background: var(--warn-s); } .rank.l { background: var(--frozen-s); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px;
+                         background: var(--c); border: 1px solid var(--s); }
+  @media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); } nav { display: none; } }
+
+  /* comments */
+  ::highlight(cmt) { background: color-mix(in srgb, var(--warn-s) 35%, transparent); }
+  ::highlight(cmt-active) { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+  #cToggle { position: fixed; top: 14px; right: 16px; z-index: 30; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+             border-radius: 18px; padding: 6px 14px; font: 600 13px system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  #cPanel { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100vw); z-index: 25; background: var(--panel);
+            border-left: 1px solid var(--line); padding: 58px 16px 24px; overflow-y: auto; transform: translateX(100%); transition: transform .2s; }
+  #cPanel.open { transform: none; box-shadow: -4px 0 18px rgba(0,0,0,.08); }
+  body.cOpen .wrap { margin-right: min(400px, 100vw); }
+  #cPanel .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  #cPanel .filters { display: flex; gap: 12px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .thread { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 14px; background: var(--bg); }
+  .thread.resolved { opacity: .55; }
+  .thread .sec { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
+  .thread .q { border-left: 3px solid var(--warn-s); padding-left: 8px; color: var(--muted); font-size: 13px; margin: 4px 0 6px; cursor: pointer;
+               max-height: 4.5em; overflow: hidden; }
+  .msg { margin: 6px 0; white-space: pre-wrap; }
+  .msg .who { font-weight: 650; font-size: 12px; } .msg .who.claude { color: var(--dec-s); }
+  .msg .when { color: var(--muted); font-size: 11px; margin-left: 6px; }
+  .thread .acts { display: flex; gap: 10px; margin-top: 6px; font-size: 12px; }
+  .thread .acts button, .cBtn { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
+  textarea.cIn { width: 100%; min-height: 64px; margin-top: 6px; font: 14px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--panel);
+                 border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; resize: vertical; }
+  .cRow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .cRow button { border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 13px; }
+  .cRow button.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #cPop { position: absolute; z-index: 40; display: none; background: var(--accent); color: #fff; border: none; border-radius: 14px; padding: 4px 12px;
+          font: 600 12px system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  h2 .addc { font-size: 12px; font-weight: 500; margin-left: 10px; opacity: 0; color: var(--accent); cursor: pointer; }
+  h2:hover .addc { opacity: 1; }
+  .ccount { display: inline-block; font-size: 11px; font-weight: 600; background: var(--warn-s); color: #fff; border-radius: 9px; padding: 0 6px;
+            margin-left: 8px; vertical-align: 3px; cursor: pointer; }
+  #cOffline { display: none; background: var(--warn); border-left: 4px solid var(--warn-s); padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="t">Contents</div>
+  <a href="#status">Status</a>
+  <a href="#overview">Pipeline</a>
+  <a href="#data">Data &amp; targets</a>
+  <a href="#inputs">Frozen features</a>
+  <a href="#tokenizer">Tokenizer</a>
+  <a href="#encoder">Encoder</a>
+  <a href="#heads">Heads</a>
+  <a href="#assign">One-to-many assignment</a>
+  <a href="#existence">Existence heatmap</a>
+  <a href="#denseloss">Dense loss</a>
+  <a href="#decoder">Top-k decoder</a>
+  <a href="#topkloss">Top-k loss</a>
+  <a href="#training">Training</a>
+  <a href="#eval">Evaluation</a>
+  <a href="#params">Parameters</a>
+  <a href="#results">Results</a>
+  <a href="#latency">Latency</a>
+  <a href="#suspects">Where it may go wrong</a>
+</nav>
+<main>
+<h1>Single-frame SQ predictor (exp 22)</h1>
+<p class="sub">RGB-D frame → set of plain superquadrics in the camera frame, each with existence, class and instance mask. Two models:
+<b>dense</b> (<code>--dense</code>, <code>model.DenseModel</code>), one SQ per patch trained one-to-many, and <b>top-k</b>
+(<code>--topk</code>, <code>model.TopKModel</code>), the dense model as encoder plus a decoder over its 300 best proposals trained one-to-one.
+State of <code>code/model.py</code>, <code>code/dense.py</code> and <code>code/train.py</code> on 2026-11-06.</p>
+
+<h2 id="status">Status</h2>
+<p>Both models fit one frame and 16 frames. The heatmap existence fixed the selection problem of the earlier patch-query models: on
+16 frames top-k finds 85 % of the visible SQs at existence 0.3 (the old patch-query model 50 %). On the full training set (7 scenes,
+1400 frames) they still fit the training frames moderately, but <b>do not generalize to room_0 at all</b>. For dense, 34 % of the SQs
+of training frames have a proposal with IoU &gt; 0.5, against 1.4 % on room_0. The open problem is therefore generalization (data,
+targets, inputs) more than optimization.</p>
+<div class="kpis">
+  <div class="kpi"><div class="v">0.62</div><div class="l">pair IoU, top-k, 1 frame</div></div>
+  <div class="kpi"><div class="v">0.54</div><div class="l">pair IoU, top-k, 16 frames</div></div>
+  <div class="kpi"><div class="v">0.34 / 0.014</div><div class="l">dense recall@0.5, train frames / room_0</div></div>
+  <div class="kpi"><div class="v">0.08</div><div class="l">pair IoU, top-k, room_0 (epoch 60)</div></div>
+  <div class="kpi"><div class="v">48 / 64 ms</div><div class="l">step (8 frames), dense / top-k</div></div>
+</div>
+
+<h2 id="overview">Pipeline</h2>
+<svg viewBox="0 0 1000 600" role="img" aria-label="Pipeline of the dense and top-k models">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <g stroke-width="1.5">
+    <!-- inputs -->
+    <rect x="10" y="20" width="150" height="54" rx="8" fill="var(--frozen)" stroke="var(--frozen-s)"/>
+    <text x="85" y="42" text-anchor="middle" class="b">RGB 1200×672</text><text x="85" y="60" text-anchor="middle" class="mut">rows 4..676 of 680</text>
+    <rect x="10" y="130" width="150" height="54" rx="8" fill="var(--frozen)" stroke="var(--frozen-s)"/>
+    <text x="85" y="152" text-anchor="middle" class="b">Depth /4: 168×300</text><text x="85" y="170" text-anchor="middle" class="mut">camera frame z (m)</text>
+    <!-- backbones -->
+    <rect x="200" y="20" width="170" height="54" rx="8" fill="var(--img)" stroke="var(--img-s)" stroke-dasharray="5 3"/>
+    <text x="285" y="42" text-anchor="middle" class="b">DINOv3 ViT-L/16</text><text x="285" y="60" text-anchor="middle" class="mut">frozen · 42×75×1024</text>
+    <rect x="200" y="130" width="170" height="54" rx="8" fill="var(--geo)" stroke="var(--geo-s)" stroke-dasharray="5 3"/>
+    <text x="285" y="152" text-anchor="middle" class="b">Sonata (PTv3)</text><text x="285" y="170" text-anchor="middle" class="mut">frozen · stages 2–4: 1088 / px</text>
+    <path d="M160 47H198" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M160 157H198" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <!-- tokenizer -->
+    <rect x="410" y="10" width="250" height="200" rx="10" fill="var(--tok)" stroke="var(--tok-s)"/>
+    <text x="535" y="32" text-anchor="middle" class="b">Tokenizer (per 16 px patch)</text>
+    <text x="425" y="58">Sonata: max-pool over the patch's</text>
+    <text x="425" y="76">      16 pixels with depth → 1088</text>
+    <text x="425" y="100">LN([DINO 1024 ‖ Sonata 1088])</text>
+    <text x="425" y="118">      → Lin 2112→256 → GELU → 128</text>
+    <text x="425" y="142">+ Lin(Fourier(anchor, 8 freqs))</text>
+    <text x="425" y="166" class="mut">anchor = patch centroid (3D),</text>
+    <text x="425" y="182" class="mut">or 3 m along the ray without depth</text>
+    <text x="425" y="202" class="mut">out: 3150 tokens × 128</text>
+    <path d="M370 47H408" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M370 157H408" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M85 184V230H535V212" stroke="var(--muted)" fill="none" marker-end="url(#ar)"/>
+    <text x="175" y="224" class="mut">back-projected xyz → centroid</text>
+    <!-- encoder -->
+    <rect x="700" y="10" width="290" height="80" rx="10" fill="var(--dec)" stroke="var(--dec-s)"/>
+    <text x="845" y="32" text-anchor="middle" class="b">Encoder · 1 layer</text>
+    <text x="715" y="56">pre-norm self-attention over 3150</text>
+    <text x="715" y="76">8 heads · FFN 512 · GELU · + LayerNorm</text>
+    <path d="M660 50H698" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <!-- enc heads -->
+    <rect x="700" y="120" width="290" height="90" rx="10" fill="var(--head)" stroke="var(--head-s)"/>
+    <text x="845" y="142" text-anchor="middle" class="b">Heads per patch → 3150 SQs</text>
+    <text x="715" y="164">scale, exponents, rotation, trans = anchor + Δ</text>
+    <text x="715" y="182">existence (heatmap), class (51)</text>
+    <text x="715" y="200">mask = MLP(q) · Lin(q') over 42×75</text>
+    <path d="M845 90V118" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <!-- dense box -->
+    <rect x="700" y="230" width="290" height="70" rx="10" fill="none" stroke="var(--head-s)" stroke-dasharray="6 4"/>
+    <text x="715" y="252" class="b">--dense: output</text>
+    <text x="715" y="272">top 300 of the 3×3 local maxima</text>
+    <text x="715" y="290" class="mut">of the existence map = the prediction</text>
+    <path d="M845 210V228" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <!-- top-k decoder -->
+    <rect x="410" y="330" width="580" height="170" rx="10" fill="none" stroke="var(--dec-s)" stroke-dasharray="6 4"/>
+    <text x="425" y="352" class="b">--topk: decoder over the proposals</text>
+    <rect x="720" y="365" width="260" height="52" rx="8" fill="var(--dec)" stroke="var(--dec-s)"/>
+    <text x="850" y="386" text-anchor="middle" class="b">select K = 300 (detached)</text><text x="850" y="404" text-anchor="middle" class="mut">query = encoder token · ref = proposal SQ</text>
+    <rect x="425" y="365" width="270" height="52" rx="8" fill="var(--dec)" stroke="var(--dec-s)"/>
+    <text x="560" y="386" text-anchor="middle" class="b">Decoder layer ×1 (pre-norm, 8 heads)</text><text x="560" y="404" text-anchor="middle" class="mut">self-attn over K → cross-attn to 3150 → FFN</text>
+    <rect x="425" y="435" width="555" height="52" rx="8" fill="var(--head)" stroke="var(--head-s)"/>
+    <text x="702" y="456" text-anchor="middle" class="b">Refine heads → 300 SQs</text><text x="702" y="474" text-anchor="middle" class="mut">scale = ref · exp(Δ), exponents = σ(logit(ref) + Δ), trans = ref + Δ; rotation, existence, class, mask anew</text>
+    <path d="M960 300V363" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M720 391H697" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M560 417V433" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <!-- loss -->
+    <rect x="10" y="270" width="370" height="320" rx="10" fill="var(--panel)" stroke="var(--line)"/>
+    <text x="25" y="294" class="b">Loss</text>
+    <text x="25" y="318" class="b">Proposals (both models), one-to-many:</text>
+    <text x="25" y="338">each patch → the visible SQ owning ≥ 50 %</text>
+    <text x="25" y="356">      of its pixels (else negative)</text>
+    <text x="25" y="376">2 · CenterNet focal on the heatmap</text>
+    <text x="25" y="394">≤ 512 positives / frame, ∝ 1 / SQ size:</text>
+    <text x="25" y="412">  10 · Chamfer + 10 · forced (8×8)</text>
+    <text x="25" y="430">  2 · class CE · 5 · mask BCE + 5 · Dice</text>
+    <text x="25" y="460" class="b">Decoder (top-k), one-to-one:</text>
+    <text x="25" y="480">Hungarian to the visible SQs, cost</text>
+    <text x="25" y="498">  10 · CD(4×4) + 2 · (1 − p_cls) + (1 − exist)</text>
+    <text x="25" y="518">2 · focal existence (matched = 1)</text>
+    <text x="25" y="536">10 · Chamfer + 10 · forced (16×16)</text>
+    <text x="25" y="554">2 · class CE · 5 · mask BCE + 5 · Dice</text>
+    <text x="25" y="578" class="mut">top-k: L = L_proposals + L_decoder</text>
+  </g>
+</svg>
+<div class="legend">
+  <span style="--c:var(--frozen);--s:var(--frozen-s)">input</span>
+  <span style="--c:var(--img);--s:var(--img-s)">frozen image backbone (cached)</span>
+  <span style="--c:var(--geo);--s:var(--geo-s)">frozen point backbone (cached)</span>
+  <span style="--c:var(--tok);--s:var(--tok-s)">trainable tokenizer</span>
+  <span style="--c:var(--dec);--s:var(--dec-s)">transformer</span>
+  <span style="--c:var(--head);--s:var(--head-s)">prediction heads</span>
+</div>
+
+<h2 id="data">Data &amp; targets</h2>
+<p>The 8 NICE-SLAM Replica scenes, every 10th rendered frame, 200 frames per scene, cached by <code>cache_frames.py</code> /
+<code>cache_sonata.py</code> in <code>Thesis/data/replica_rgbd_frames</code>. Training uses 7 scenes (1400 frames); testing uses room_0 (200 frames).</p>
+<p>The cache stores a frame's targets as every SQ of its scene's target decomposition (<code>results/targets_winding</code>: robust SuperFlex +
+post-optimization per GT instance, plain SQs) that touches the camera frustum, in the camera frame (x right, y down, z forward).
+Both models train and evaluate only on the <b>visible</b> SQs among them: SQs that own at least one pixel (see <a href="#assign">assignment</a>).
+Hidden SQs are dropped, which is about 30 % of the cached targets.</p>
+<div class="tbl"><table>
+  <tr><th>scene</th><th class="n">SQs in scene</th><th class="n">cached targets / frame (median)</th><th class="n">visible instances (median)</th></tr>
+  <tr><td><b>room_0 (test)</b></td><td class="n">250</td><td class="n"><b>98.5</b></td><td class="n">31</td></tr>
+  <tr><td>room_1</td><td class="n">149</td><td class="n">54</td><td class="n">17</td></tr>
+  <tr><td>room_2</td><td class="n">201</td><td class="n">84.5</td><td class="n">22</td></tr>
+  <tr><td>office_0</td><td class="n">162</td><td class="n">54</td><td class="n">11</td></tr>
+  <tr><td>office_1</td><td class="n">101</td><td class="n">30</td><td class="n">12</td></tr>
+  <tr><td>office_2</td><td class="n">178</td><td class="n">46</td><td class="n">14</td></tr>
+  <tr><td>office_3</td><td class="n">237</td><td class="n">69.5</td><td class="n">24</td></tr>
+  <tr><td>office_4</td><td class="n">188</td><td class="n">43.5</td><td class="n">13</td></tr>
+</table></div>
+<div class="warn">room_0 is the densest scene: on average 68 visible SQs per frame, against about 41 on training frames. Classes: 51 names (union of the
+scenes' GT instance names). Instance labels per pixel come from the GT instance renders (−1 unlabelled; office_4's table is unlabelled).</div>
+
+<h2 id="inputs">Frozen features (cached per frame)</h2>
+<h3>DINOv3 ViT-L/16 <span class="tag frozen">frozen</span></h3>
+<p><code>facebook/dinov3-vitl16-pretrain-lvd1689m</code>, ImageNet normalization, run in bfloat16. Last-layer patch tokens of rows 4..676 of the
+1200×680 image: <b>42×75 × 1024</b>, stored as float16. No augmentation, so the tokens are identical every epoch.</p>
+<h3>Sonata (PTv3) <span class="tag frozen">frozen</span></h3>
+<p>Input: the frame's valid depth pixels at /4 (168×300), back-projected and moved to the <b>world frame</b> (z up, as Sonata was trained), with
+color and a normal from the depth map, at 2 cm grid sampling. The 3 coarsest stages are kept (192 / 384 / 512 channels; roughly 8 / 16 / 32 cm
+voxels), stored as stage tokens plus the token index of every pixel per stage. Per pixel that gives 1088 channels.</p>
+<p class="sub">Neither feature set has been inspected visually yet; this is the first viewer of experiment 23.</p>
+
+<h2 id="tokenizer">Tokenizer <span class="tag train">trainable · 584 k</span></h2>
+<p>One token per 16 px patch, which is 4×4 = 16 pixels of the /4 view. <code>DenseModel.encode</code></p>
+<div class="tbl"><table>
+  <tr><th>step</th><th>operation</th><th>shape</th></tr>
+  <tr><td>Sonata per patch</td><td>per stage: gather each pixel's stage token, <b>max over the patch's pixels with depth</b>, concatenate the 3 stages; zero for patches without depth</td><td>B×42×75×1088</td></tr>
+  <tr><td>anchor</td><td>mean back-projected point of the patch's pixels with depth (camera frame); without depth, 3 m along the ray through the patch center</td><td>B×3150×3</td></tr>
+  <tr><td>input MLP</td><td><code>LayerNorm(2112) → Linear(2112 → 256) → GELU → Linear(256 → 128)</code> on [DINO token ‖ Sonata]</td><td>B×3150×128</td></tr>
+  <tr><td>position</td><td>+ <code>Linear(48 → 128)</code> of Fourier(anchor): sin / cos of x · 2<sup>i</sup> π / 16, i = 0..7 (periods 32 m … 25 cm) per coordinate</td><td>B×3150×128</td></tr>
+</table></div>
+<p>There is no 2D grid position: DINOv3 tokens carry their own position (RoPE inside the ViT), and the anchor gives the 3D position. Removed compared
+with the earlier tokenizer: the per-pixel point MLP, the mean pooling and the valid-pixel share.</p>
+
+<h2 id="encoder">Encoder <span class="tag train">199 k</span></h2>
+<p><code>nn.TransformerEncoder</code> with <b>1</b> layer (<code>--layers</code>): pre-norm, self-attention over all 3150 patch tokens, 8 heads, feed-forward
+512, GELU, no dropout, followed by a final LayerNorm. Its output tokens feed the per-patch heads and, for top-k, also the decoder (both as queries and as
+memory).</p>
+
+<h2 id="heads">Heads <span class="tag train">41 k + mask 17 k</span></h2>
+<p><code>model.Heads</code>, applied to each of the 3150 encoder tokens:</p>
+<div class="tbl"><table>
+  <tr><th>output</th><th>parameterization</th><th>init</th></tr>
+  <tr><td>scale (3 half-axes, m)</td><td><code>softplus(Linear) + 0.005</code></td><td>bias → 0.2 m</td></tr>
+  <tr><td>exponents e1, e2</td><td><code>0.1 + 1.8 · σ(Linear)</code> ∈ (0.1, 1.9)</td><td>≈ 1.0</td></tr>
+  <tr><td>rotation</td><td>quaternion <code>normalize(Linear)</code> → matrix</td><td>default</td></tr>
+  <tr><td>translation</td><td><code>anchor + Linear</code></td><td>weight 0, bias 0 → the anchor</td></tr>
+  <tr><td>existence</td><td><code>σ(Linear)</code>, trained as a heatmap</td><td>default</td></tr>
+  <tr><td>class</td><td><code>Linear → 51 logits</code></td><td>default</td></tr>
+  <tr><td>mask</td><td>logits over the 3150 patches: <code>MLP(q) · mask_p(q')</code> for all encoder tokens q' (Mask2Former style, at patch resolution)</td><td>default</td></tr>
+</table></div>
+
+<h2 id="assign">One-to-many assignment</h2>
+<p><code>dense.assign</code>, per frame, without any prediction-dependent cost:</p>
+<ol>
+  <li><b>Pixel owner</b> (<code>train.pixel_owner</code>): each labelled pixel is back-projected; among the target SQs of its GT instance it belongs to the one
+  with the smallest SDF at that point. Pixels of instances without target SQs and unlabelled pixels have no owner.</li>
+  <li><b>Patch owner</b>: a patch is positive for the SQ that owns ≥ 50 % of its 16 pixels; otherwise it is a negative.</li>
+  <li><b>Thin parts</b>: a visible SQ without any such patch gets the patch where its share is largest (about 10 SQs per frame).</li>
+  <li><b>Visible SQs</b> = SQs that own at least one pixel. Only these are targets, for the proposals and for the decoder.</li>
+</ol>
+<p>Typical frame: about 2,900 of 3,150 patches are positive; an SQ owns between 1 and about 1,000 patches (median 33).</p>
+
+<h2 id="existence">Existence heatmap and selection</h2>
+<p>A per-patch "lies on an SQ" target is useless for ranking: in the first dense overfit 99.5 % of patches scored ≈ 0.995, and the top 300 all came from one SQ.
+So existence is trained CenterNet style (<code>dense.heatmap</code>, <code>dense.center_focal</code>):</p>
+<ul>
+  <li>per SQ, its <b>center</b> = the patch deepest inside its region (largest distance to the region's border, <code>distance_transform_edt</code>);</li>
+  <li>target = a Gaussian around the center with σ = max(0.5, √(patches) / 4) in patch units, restricted to the SQ's own patches; 1 at the center;
+  heatmaps of different SQs are combined by max;</li>
+  <li>loss = penalty-reduced focal loss (α 2, β 4): −(1−p)² log p at centers, −(1−h)⁴ p² log(1−p) elsewhere, summed and divided by the number of centers.</li>
+</ul>
+<p><b>Selection</b> (<code>model.peaks</code>): a patch is kept only if it is the maximum of its 3×3 neighbourhood (max-pool NMS); all others are set to −1.
+Proposals are the top K = 300 of what remains, ranked by existence. When there are fewer than 300 local maxima, the rest are filled with arbitrary non-maxima (score −1).</p>
+<pre>exist (B, 42·75) ──max_pool 3×3──▶ keep where exist == pooled ──▶ topk(300)</pre>
+
+<h2 id="denseloss">Dense (proposal) loss</h2>
+<p><code>dense.losses</code>, averaged over the frames of a batch. Up to 512 positive patches per frame are sampled without replacement with
+probability ∝ 1 / (patches of their SQ), so that every SQ counts about equally regardless of its size. Each sampled patch is compared with the SQ
+that owns it:</p>
+<div class="tbl"><table>
+  <tr><th>term</th><th class="n">weight</th><th>definition</th></tr>
+  <tr><td><code>exist</code></td><td class="n">2</td><td>CenterNet focal loss over all 3150 patches (above)</td></tr>
+  <tr><td><code>cd</code></td><td class="n">10</td><td>Chamfer(patch SQ, owner SQ), 8×8 regular (η, ω) surface samples each, sum of both directions (m)</td></tr>
+  <tr><td><code>forced</code></td><td class="n">10</td><td>the same with the patch SQ moved to the owner's translation (SuperFlex: shape learns while the position is wrong)</td></tr>
+  <tr><td><code>cls</code></td><td class="n">2</td><td>cross entropy of the owner's class</td></tr>
+  <tr><td><code>mask</code> / <code>dice</code></td><td class="n">5 / 5</td><td>BCE and Dice of the patch's 42×75 mask against the owner's <b>instance</b> mask (share of the instance's pixels per patch)</td></tr>
+</table></div>
+<p>Negative patches get only the existence term. The mask target is the instance, not the SQ, so all SQs of one instance learn the same mask.</p>
+
+<h2 id="decoder">Top-k decoder <span class="tag new">--topk · 312 k</span></h2>
+<p><code>model.TopKModel</code>: the dense model above is the encoder and its 3150 per-patch SQs are <b>proposals</b>.</p>
+<ol>
+  <li><b>Select</b> the K = 300 proposals as in <a href="#existence">selection</a>, on the detached existence map. Selection is not differentiable.</li>
+  <li><b>Query</b> = the selected patches' encoder output tokens (not detached: the decoder loss trains the encoder too). <b>Reference</b> = their
+  proposal scale, exponents and translation, detached.</li>
+  <li><b>Decoder layer</b> (<code>--dec_layers</code> = 1): <code>q ← layer(q + Linear(Fourier(ref.trans)), memory = all 3150 encoder tokens)</code>,
+  a pre-norm <code>nn.TransformerDecoderLayer</code> (self-attention over the 300 queries, cross-attention to the memory, FFN 512, 8 heads, GELU, no dropout),
+  then a LayerNorm. The positional term is added into the residual stream once per layer, not to queries and keys inside each attention as in DETR.</li>
+  <li><b>Refine heads</b> (<code>RefineHeads</code>): scale = ref · exp(Δ), exponents = 0.1 + 1.8 σ(logit(ref) + Δ), translation = ref + Δ, with all Δ layers
+  initialized to 0, so the decoder starts exactly at the proposals. Rotation, existence, class and mask are predicted anew.</li>
+  <li>With more layers, each layer's output (detached) becomes the next reference and earlier layers go to <code>aux</code>, each with its own loss.
+  Not used yet.</li>
+</ol>
+
+<h2 id="topkloss">Top-k loss</h2>
+<p><code>dense.topk_losses</code> = the <a href="#denseloss">dense loss</a> on the proposals (logged as <code>proposals/*</code>) + the Hungarian loss
+<code>train.losses</code> on the decoder's 300 SQs against the <b>visible</b> SQs of the frame, weight 1 each:</p>
+<pre>matching cost[q, t] = 10 · Chamfer_4×4(q, t)  +  2 · (1 − softmax(cls_q)[class_t])  +  1 · (1 − exist_q)
+                      (scipy linear_sum_assignment, every visible SQ gets exactly one of the 300 queries)</pre>
+<div class="tbl"><table>
+  <tr><th>term</th><th class="n">weight</th><th>definition</th></tr>
+  <tr><td><code>exist</code></td><td class="n">2</td><td>sigmoid focal loss (α 0.25, γ 2) over the 300 queries, matched = 1, summed / number of targets</td></tr>
+  <tr><td><code>cd</code> / <code>forced</code></td><td class="n">10 / 10</td><td>Chamfer of matched pairs, 16×16 samples; forced = at the target's translation</td></tr>
+  <tr><td><code>cls</code></td><td class="n">2</td><td>cross entropy, matched queries</td></tr>
+  <tr><td><code>mask</code> / <code>dice</code></td><td class="n">5 / 5</td><td>BCE / Dice against the matched target's instance mask</td></tr>
+</table></div>
+
+<h2 id="training">Training</h2>
+<ul>
+  <li>AdamW, lr 1e-4, weight decay 1e-4, OneCycle, gradient clip 1.0, batch 8 frames, no augmentation.</li>
+  <li><b>1 frame</b> (<code>--overfit room_2_000500</code>, 68 visible SQs): 3000 steps.</li>
+  <li><b>16 frames</b> (<code>--frames 16</code>, evenly spaced over the training scenes, about 42 visible SQs each): 6000 steps, train = evaluation frames.</li>
+  <li><b>Full</b>: 150 epochs × 175 steps = 26 k steps. Evaluation every 10 epochs on room_0 (200 frames) and 100 training frames.</li>
+</ul>
+
+<h2 id="eval">Evaluation</h2>
+<h3>Proposals (dense, and <code>enc_*</code> for top-k)</h3>
+<ul>
+  <li><b>recall@0.5</b>: share of visible SQs with at least one of the 300 proposals at pair IoU &gt; 0.5; <b>best IoU</b>: mean of that best IoU.
+  Pair IoU = volumetric IoU on 1024 points uniform in the pair's joint box.</li>
+  <li><b>exist precision / recall</b>: patches with existence &gt; 0.5 against the assigned positive patches. Recall is low by design (only centers are 1).</li>
+  <li><b>predicted</b>: patches with existence &gt; 0.5 (compare with the number of visible SQs).</li>
+  <li><b>occupancy IoU</b>: union of the predicted SQs (top 300, or existence &gt; 0.5) against the union of the visible SQs, 32 k points in their box.</li>
+  <li><b>class accuracy</b> of the positive patches.</li>
+</ul>
+<h3>Decoder (top-k)</h3>
+<ul>
+  <li>Hungarian matching with the training cost to the visible SQs. <b>pair IoU</b> and Chamfer of the matched pairs (independent of existence).</li>
+  <li><b>found</b> @0.5 / @0.3: share of visible SQs whose matched query is above the threshold; <b>predicted</b> @0.5 / @0.3.</li>
+  <li><b>occupancy IoU</b> @0.5 / @0.3; <b>mask coverage</b>: queries above 0.5 grouped by mask overlap into instances, mean best IoU per GT instance.</li>
+</ul>
+
+<h2 id="params">Parameters</h2>
+<div class="tbl"><table>
+  <tr><th>module</th><th class="n">parameters</th><th>note</th></tr>
+  <tr><td>input MLP (LN + 2112 → 256 → 128)</td><td class="n">578 k</td><td>541 k of it is the first Linear</td></tr>
+  <tr><td>position (Fourier → 128)</td><td class="n">6 k</td><td></td></tr>
+  <tr><td>encoder (1 layer + LN)</td><td class="n">199 k</td><td></td></tr>
+  <tr><td>heads + mask_p</td><td class="n">58 k</td><td></td></tr>
+  <tr><td><b>dense total</b></td><td class="n"><b>841 k</b></td><td></td></tr>
+  <tr><td>decoder layer + LN + position</td><td class="n">271 k</td><td></td></tr>
+  <tr><td>refine heads</td><td class="n">41 k</td><td></td></tr>
+  <tr><td><b>top-k total</b></td><td class="n"><b>1.15 M</b></td><td>frozen backbones: ~300 M (DINOv3-L) + ~100 M (Sonata)</td></tr>
+</table></div>
+
+<h2 id="results">Results</h2>
+<p>All on visible SQs. "1 frame" and "16 frames" evaluate on their own training frames.</p>
+<div class="tbl"><table>
+  <tr><th>run</th><th>evaluated on</th><th class="n">proposal recall@0.5 / best IoU</th><th class="n">pair IoU</th><th class="n">found 0.5 / 0.3</th><th class="n">predicted 0.5 / visible</th><th class="n">occ. IoU</th><th class="n">mask cov.</th></tr>
+  <tr><td>of_dense_heat</td><td>1 frame</td><td class="n">0.62 / 0.51</td><td class="n">–</td><td class="n">–</td><td class="n">112 / 68</td><td class="n">0.57</td><td class="n">–</td></tr>
+  <tr><td>of_topk</td><td>1 frame</td><td class="n">0.44 / 0.41</td><td class="n">0.62</td><td class="n">0.68 / 0.97</td><td class="n">47 / 68</td><td class="n">0.11 / 0.68 (@0.3)</td><td class="n">0.55</td></tr>
+  <tr><td>f16_dense</td><td>16 frames</td><td class="n">0.42 / 0.41</td><td class="n">–</td><td class="n">–</td><td class="n">107 / 42</td><td class="n">0.38</td><td class="n">–</td></tr>
+  <tr><td>f16_topk</td><td>16 frames</td><td class="n">0.28 / 0.32</td><td class="n">0.54</td><td class="n">0.55 / 0.85</td><td class="n">25 / 42</td><td class="n">0.16 / 0.28 (@0.3)</td><td class="n">0.48</td></tr>
+  <tr><td>full_dense</td><td>100 train frames</td><td class="n">0.34 / 0.35</td><td class="n">–</td><td class="n">–</td><td class="n">144 / 41</td><td class="n">0.37</td><td class="n">–</td></tr>
+  <tr><td>full_dense</td><td>room_0</td><td class="n">0.014 / 0.13</td><td class="n">–</td><td class="n">–</td><td class="n">169 / 68</td><td class="n">0.15</td><td class="n">–</td></tr>
+  <tr><td>full_topk (ep. 60)</td><td>room_0</td><td class="n">0.016 / 0.12</td><td class="n">0.08</td><td class="n">0.27 / 0.67</td><td class="n">25 / 68</td><td class="n">0.04 / 0.14 (@0.3)</td><td class="n">0.21</td></tr>
+</table></div>
+<p class="sub">Occupancy for dense = existence &gt; 0.5. The old patch-query model on the same 16 frames: found 0.13 / 0.50. full_topk was stopped at epoch 63 / 150.</p>
+<ul>
+  <li>In top-k the encoder's proposals are worse than in the dense model alone (16 frames: recall 0.28 against 0.42): the decoder's gradient into the encoder
+  competes with the proposal loss.</li>
+  <li>full_dense's test metrics are flat from epoch 30 on; room_0 proposals hardly overlap any target (best IoU 0.13).</li>
+</ul>
+
+<h2 id="latency">Latency</h2>
+<p>RTX 5090, batch 8 (<code>results/latency.md</code>, <code>results/speedups.md</code>). The step was overhead-bound (many small kernels in per-frame Python loops).
+Four exact changes (same losses, gradients and metrics) made it 3.2× / 3.6× faster:</p>
+<div class="tbl"><table>
+  <tr><th>change</th><th class="n">dense ms / step</th><th class="n">top-k ms / step</th></tr>
+  <tr><td>before</td><td class="n">155</td><td class="n">230</td></tr>
+  <tr><td>plain SQ surface sampler instead of SuperFlex's (1 ms per call regardless of size)</td><td class="n">121</td><td class="n">162</td></tr>
+  <tr><td>losses as one geometric pass over the batch (matching still per frame)</td><td class="n">100</td><td class="n">124</td></tr>
+  <tr><td>assignment + heatmap cached per frame (<code>cache_assign.py</code>)</td><td class="n">103</td><td class="n">191</td></tr>
+  <tr><td>Sonata patch max-pool over unique (patch, token) pairs</td><td class="n">148</td><td class="n">227</td></tr>
+  <tr><td><b>all four (current code)</b></td><td class="n"><b>48</b></td><td class="n"><b>64</b></td></tr>
+</table></div>
+<p>Left: backward 22 / 29 ms, forward 10 / 12, loss 9 / 16. A full run (150 epochs) takes about 20 / 28 min plus evaluation. bf16 and torch.compile were tested and not kept.</p>
+
+<h2 id="suspects">Where it may go wrong</h2>
+<p>Ranked by how well they fit the evidence: both models fit 16 frames, fit 1400 training frames moderately, and fail on room_0.</p>
+
+<div class="suspect"><h3><span class="rank">1</span>Too little data for generalization</h3>
+<p>7 scenes, each seen from 200 nearby viewpoints, no augmentation, frozen features identical every epoch. Class accuracy is 0.99 on training frames, so the model can
+identify scene and position and read off the answer. room_0 is also the densest scene (68 visible SQs against about 41).</p>
+<p class="ev">Check: leave-one-scene-out on an easier test scene (office_1, room_1); augmentation (flips, crops, depth scale). Fix: more scenes (rest of Replica, ScanNet++, exp 18's chairs).</p></div>
+
+<div class="suspect"><h3><span class="rank">1</span>Target definition is not learnable as a rule</h3>
+<p>The targets are a per-instance SQ decomposition fitted offline. The number of SQs per instance and where one SQ ends and the next begins are not
+determined by the image; neighbouring instances of the same kind can be split differently. Across 1400 frames these inconsistent splits have to be
+averaged, which fits training frames only moderately and does not transfer.</p>
+<p class="ev">Check (results viewer): do test predictions find the right objects but split them differently, or miss objects altogether? Compare instance-level
+metrics (mask coverage, occupancy) against SQ-level ones.</p></div>
+
+<div class="suspect"><h3><span class="rank m">2</span>Existence peaks do not match SQs</h3>
+<p>The dense model predicts 107–169 peaks above 0.5 for 41–68 visible SQs, so several peaks per SQ (large SQs such as walls have broad Gaussians with flat tops)
+and the 300 slots fill with duplicates. On room_0 the peaks may also sit on regions that the training scenes never decomposed this way.</p>
+<p class="ev">Check: the existence map and peaks overlaid on RGB in the results viewer. Fix: smaller σ, or 5×5 NMS, or an IoU-aware score.</p></div>
+
+<div class="suspect"><h3><span class="rank m">2</span>Proposal quality bounds the decoder</h3>
+<p>The decoder only refines the 300 selected proposals, with one layer. If the right SQ is not among the proposals, it cannot be recovered. On 16 frames, proposal
+recall is 0.28, yet 85 % are found at 0.3, so the decoder does fix a lot. On room_0 the proposals are already broken (best IoU 0.12).</p>
+<p class="ev">Fix: more decoder layers with iterative refinement and auxiliary losses (planned, see the earlier thread); learned queries next to the proposals.</p></div>
+
+<div class="suspect"><h3><span class="rank l">3</span>Inputs not verified</h3>
+<p>Nobody has looked at the DINO and Sonata features of these frames. Possible issues: misaligned crop rows, Sonata in the world frame against camera-frame
+predictions, pixels mapped to the wrong stage tokens.</p>
+<p class="ev">Check: the feature viewer of experiment 23 (PCA colors and similarity maps per frame).</p></div>
+
+<div class="suspect"><h3><span class="rank l">3</span>Capacity</h3>
+<p>d = 128, 1 encoder layer, 1 decoder layer, 1.15 M trainable parameters. The fit of training frames drops from 0.62 (1 frame) to 0.42 (16) to 0.34 (1400) in
+dense recall, so capacity contributes to the underfitting, but it cannot explain the train / test gap of 0.34 against 0.014.</p></div>
+</main>
+</div>
+
+<button id="cToggle">Comments</button>
+<button id="cPop">+ Comment</button>
+<aside id="cPanel" aria-label="Comments">
+  <p class="hint">Select text anywhere and click <b>+ Comment</b>, or hover a section title for <b>comment on section</b>.
+    Stored in <code>results/comments/architecture.json</code>.</p>
+  <div id="cOffline">Comments need the server: <code>uv run python experiments/22_rgbd_prediction/viewer/server.py</code>,
+    then open http://localhost:8022/architecture.html</div>
+  <div id="cNew"></div>
+  <div class="filters"><label><input type="checkbox" id="cShowResolved"> show resolved</label></div>
+  <div id="cList"></div>
+</aside>
+
+<script>
+(() => {
+  const PAGE = 'architecture_2026_11_06', API = `/api/comments/${PAGE}`;
+  const $ = id => document.getElementById(id);
+  const main = document.querySelector('main');
+  const sections = [...main.querySelectorAll('h2[id]')];
+  const title = id => (sections.find(h => h.id === id)?.firstChild.textContent || 'page').trim();
+  let threads = [], draft = null, online = location.protocol.startsWith('http');
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const norm = s => s.replace(/\s+/g, ' ').trim();
+
+  // ---- anchoring: a thread = (section id, quoted text); highlighted via the CSS Highlight API (no DOM changes)
+  function sectionOf(node) {
+    let best = '';
+    for (const h of sections) if (h.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING || h.contains(node)) best = h.id;
+    return best;
+  }
+  function sectionNodes(id) {
+    const i = sections.findIndex(h => h.id === id);
+    const start = i >= 0 ? sections[i] : main.firstChild, end = sections[i + 1] || null;
+    const w = document.createTreeWalker(main, NodeFilter.SHOW_TEXT), out = [];
+    let n, inside = i < 0;
+    while ((n = w.nextNode())) {
+      if (!inside && start.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING) inside = true;
+      if (end && (end.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING || end.contains(n))) break;
+      if (inside && !n.parentElement.closest('.addc,.ccount')) out.push(n);
+    }
+    return out;
+  }
+  function rangeFor(t) {
+    if (!t.quote) return null;
+    const map = [];  // normalized char -> [node, offset]
+    let s = '', space = true;
+    for (const n of sectionNodes(t.section)) for (let k = 0; k < n.data.length; k++) {
+      const ws = /\s/.test(n.data[k]);
+      if (ws && space) continue;
+      s += ws ? ' ' : n.data[k]; map.push([n, k]); space = ws;
+    }
+    const q = norm(t.quote), at = s.indexOf(q);
+    if (at < 0) return null;
+    const r = document.createRange(), [a, ao] = map[at], [b, bo] = map[at + q.length - 1];
+    r.setStart(a, ao); r.setEnd(b, bo + 1);
+    return r;
+  }
+  function highlight(active) {
+    if (!window.CSS || !CSS.highlights) return;
+    const all = [], act = [];
+    for (const t of threads) {
+      if (t.resolved && !$('cShowResolved').checked) continue;
+      const r = rangeFor(t);
+      if (r) (t.id === active ? act : all).push(r);
+    }
+    CSS.highlights.set('cmt', new Highlight(...all));
+    CSS.highlights.set('cmt-active', new Highlight(...act));
+  }
+  function goto(t) {
+    const r = rangeFor(t), el = r ? r.startContainer.parentElement : document.getElementById(t.section);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    highlight(t.id);
+  }
+
+  // ---- api
+  async function call(method, path = '', body) {
+    const r = await fetch(API + path, { method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    threads = await r.json(); render();
+  }
+  async function refresh() {
+    if (!online) return;
+    try {
+      const r = await fetch(API);
+      if (!r.ok) throw 0;
+      const fresh = await r.json();
+      if (JSON.stringify(fresh) !== JSON.stringify(threads)) { threads = fresh; render(); }
+    } catch { online = false; render(); }
+  }
+
+  // ---- ui
+  function msg(m) {
+    return `<div class="msg"><span class="who ${m.author === 'Claude' ? 'claude' : ''}">${esc(m.author)}</span><span class="when">${esc(m.created || '')}</span>
+      <div>${esc(m.text)}</div></div>`;
+  }
+  function render() {
+    $('cOffline').style.display = online ? 'none' : 'block';
+    const open = threads.filter(t => !t.resolved);
+    $('cToggle').textContent = `Comments (${open.length})`;
+    document.querySelectorAll('.ccount').forEach(e => e.remove());
+    for (const h of sections) {
+      const n = open.filter(t => t.section === h.id).length;
+      if (n) h.insertAdjacentHTML('beforeend', `<span class="ccount" data-sec="${h.id}">${n}</span>`);
+    }
+    $('cNew').innerHTML = draft ? `<div class="thread"><div class="sec">${esc(title(draft.section))}</div>
+        ${draft.quote ? `<div class="q">${esc(draft.quote)}</div>` : ''}
+        <textarea class="cIn" id="cDraft" placeholder="Question or thought…"></textarea>
+        <div class="cRow"><button id="cCancel">Cancel</button><button class="pri" id="cSave">Comment</button></div></div>` : '';
+    if (draft) {
+      $('cDraft').focus();
+      $('cCancel').onclick = () => { draft = null; render(); };
+      $('cSave').onclick = () => { const text = $('cDraft').value.trim(); if (text) call('POST', '', { ...draft, text }).then(() => { draft = null; render(); }); };
+      $('cDraft').onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('cSave').click(); };
+    }
+    const order = id => { const i = sections.findIndex(h => h.id === id); return i < 0 ? -1 : i; };
+    const shown = threads.filter(t => !t.resolved || $('cShowResolved').checked).sort((a, b) => order(a.section) - order(b.section));
+    $('cList').innerHTML = shown.length ? shown.map(t => `<div class="thread ${t.resolved ? 'resolved' : ''}" data-id="${t.id}">
+        <div class="sec" data-go>${esc(title(t.section))}</div>
+        ${t.quote ? `<div class="q" data-go>${esc(t.quote)}</div>` : ''}
+        ${msg(t)}${t.replies.map(msg).join('')}
+        <div class="acts"><button data-reply>reply</button><button data-resolve>${t.resolved ? 'reopen' : 'resolve'}</button><button data-del>delete</button></div>
+        <div data-box></div></div>`).join('') : `<p class="hint">No comments yet.</p>`;
+    highlight();
+  }
+  $('cList').addEventListener('click', e => {
+    const el = e.target.closest('.thread'); if (!el) return;
+    const t = threads.find(x => x.id === el.dataset.id);
+    if (e.target.closest('[data-go]')) goto(t);
+    if (e.target.closest('[data-resolve]')) call('POST', `/${t.id}/resolve`);
+    if (e.target.closest('[data-del]') && confirm('Delete this thread?')) call('DELETE', `/${t.id}`);
+    if (e.target.closest('[data-reply]')) {
+      const box = el.querySelector('[data-box]');
+      box.innerHTML = `<textarea class="cIn"></textarea><div class="cRow"><button data-x>Cancel</button><button class="pri" data-send>Reply</button></div>`;
+      const ta = box.querySelector('textarea'); ta.focus();
+      box.querySelector('[data-x]').onclick = () => box.innerHTML = '';
+      box.querySelector('[data-send]').onclick = () => ta.value.trim() && call('POST', `/${t.id}/reply`, { text: ta.value.trim() });
+      ta.onkeydown = ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) box.querySelector('[data-send]').click(); };
+    }
+  });
+  function openPanel(on = true) { $('cPanel').classList.toggle('open', on); document.body.classList.toggle('cOpen', on); }
+  function startDraft(section, quote) { draft = { section, quote }; openPanel(); render(); }
+  $('cToggle').onclick = () => openPanel(!$('cPanel').classList.contains('open'));
+  $('cShowResolved').onchange = render;
+  for (const h of sections) {
+    h.insertAdjacentHTML('beforeend', `<span class="addc">comment on section</span>`);
+    h.querySelector('.addc').onclick = () => startDraft(h.id, '');
+  }
+  main.addEventListener('click', e => { const c = e.target.closest('.ccount'); if (c) { openPanel(); const t = threads.find(x => x.section === c.dataset.sec && !x.resolved); t && goto(t); } });
+
+  // selection -> floating button
+  const pop = $('cPop');
+  document.addEventListener('mouseup', e => {
+    if (e.target === pop || $('cPanel').contains(e.target)) return;
+    setTimeout(() => {
+      const sel = getSelection(), q = norm(sel.toString());
+      if (!q || !main.contains(sel.anchorNode)) { pop.style.display = 'none'; return; }
+      const r = sel.getRangeAt(0).getBoundingClientRect();
+      pop.style.left = `${scrollX + r.right - 40}px`; pop.style.top = `${scrollY + r.bottom + 6}px`; pop.style.display = 'block';
+      pop.onclick = () => { pop.style.display = 'none'; startDraft(sectionOf(sel.anchorNode), q.slice(0, 400)); sel.removeAllRanges(); };
+    });
+  });
+
+  render();
+  refresh();
+  setInterval(refresh, 8000);
+})();
+</script>
+</body>
+</html>

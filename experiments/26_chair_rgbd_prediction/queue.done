@@ -1,0 +1,2 @@
+--name val677 --train_split val --steps 4000 --eval_every 1000
+--name train4745_30k --train_split train --steps 30000 --eval_every 5000

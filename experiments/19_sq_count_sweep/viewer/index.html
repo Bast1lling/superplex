@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chair Decompositions</title>
+<style>
+  :root { --bg: #15181d; --panel: rgba(28, 32, 39, 0.94); --fg: #e6e8eb; --muted: #9aa3ad; --accent: #5aa9ff; --line: #3a414b; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  #panel { position: absolute; top: 12px; left: 12px; width: 300px; max-height: calc(100% - 50px); overflow-y: auto; background: var(--panel);
+           border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  .row { margin: 10px 0; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .nav { display: flex; gap: 4px; align-items: center; }
+  .nav input { width: 64px; background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 4px; font: inherit; }
+  .nav button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 4px 9px; cursor: pointer; font: inherit; }
+  #id { color: var(--muted); font-size: 11px; word-break: break-all; margin-top: 4px; }
+  #ranking { display: grid; gap: 3px; }
+  #ranking button { display: grid; grid-template-columns: 22px 1fr 34px 44px; gap: 4px; background: transparent; color: var(--fg); border: 1px solid var(--line);
+                    border-radius: 5px; padding: 4px 6px; cursor: pointer; font: inherit; text-align: left; }
+  #ranking button.on { border-color: var(--accent); background: rgba(90, 169, 255, 0.15); }
+  #ranking span:nth-child(1), #ranking span:nth-child(3) { color: var(--muted); }
+  #ranking span:nth-child(3), #ranking span:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
+  label { display: block; cursor: pointer; }
+  input[type=range] { width: 100%; }
+  #views { position: absolute; top: 12px; right: 12px; width: 240px; background: #fff; border-radius: 8px; overflow: hidden; }
+  #views img { display: block; width: 100%; }
+  #keys { position: absolute; bottom: 8px; left: 14px; color: var(--muted); font-size: 11px; }
+  @media (max-width: 700px) { #views { width: 110px; } #panel { width: 220px; } }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Chair decompositions</h1>
+  <div class="row"><div class="label">Sample</div>
+    <div class="nav"><button id="prev">←</button><input id="index" type="number" min="1"><span id="total"></span>
+      <button id="next">→</button><button id="random">random</button></div>
+    <div id="id"></div></div>
+  <div class="row"><div class="label">Ranked by IoU: rank, method, SQs, IoU</div><div id="ranking"></div></div>
+  <div class="row"><div class="label">Show</div>
+    <label><input type="checkbox" id="showSq" checked> superquadrics</label>
+    <label><input type="checkbox" id="showPts"> surface points</label>
+    <div id="occupancy" hidden>
+      <label><input type="checkbox" id="showVox"> occupancy voxels</label>
+      <label><input type="checkbox" id="showQuery"> occupied query points</label></div>
+    <label id="partfield" hidden><input type="checkbox" id="showPart"> PartField parts</label></div>
+  <div class="row" id="partRow" hidden><div class="label">PartField: <span id="partCount">6</span> parts ([ ] to change)</div>
+    <input type="range" id="partLevel" min="1" max="20" step="1" value="6"></div>
+  <div class="row"><div class="label">SQ opacity</div><input type="range" id="opacity" min="0.1" max="1" step="0.05" value="1"></div>
+  <div class="row"><div class="label">Rendering</div><input type="range" id="view" min="0" max="7" step="1" value="0"></div>
+</div>
+<div id="views"><img id="rgb" alt="rendering of the chair"></div>
+<div id="keys">← → sample · ↑ ↓ rank · r random · p points · v voxels · o query points · f PartField · drag to orbit</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = id => document.getElementById(id);
+const meta = await fetch('data/meta.json').then(r => r.json());
+const verts = meta.res * meta.res, faces = meta.faces.length;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15181d);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 20);
+camera.position.set(1.7, 0.9, 2);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.8));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(2, 3, 2);
+scene.add(sun);
+
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+// golden-ratio hues: neighbouring primitives get distinct colors
+const color = j => new THREE.Color().setHSL((j * 0.618034) % 1, 0.6, 0.55);
+
+let chair = 0, method = 0, buffer = null, order = [], sq = null, points = null, loading = 0, voxels = null, query = null, parts = null;
+
+// optional: occupancy of a single chair, see experiment 20's export_voxels.py
+const occupancy = await fetch('data/voxels.json').then(r => r.ok ? r.json() : null);
+if (occupancy) {
+  const box = new THREE.BoxGeometry(occupancy.size, occupancy.size, occupancy.size), n = occupancy.voxels.length / 3, m = new THREE.Matrix4();
+  voxels = new THREE.InstancedMesh(box, new THREE.MeshStandardMaterial({ color: 0xd9d9d9, roughness: 0.9 }), n);
+  for (let i = 0; i < n; i++) voxels.setMatrixAt(i, m.makeTranslation(occupancy.voxels[3 * i], occupancy.voxels[3 * i + 1], occupancy.voxels[3 * i + 2]));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(occupancy.query, 3));
+  query = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.014, color: 0xffb020 }));
+  voxels.visible = query.visible = false;
+  scene.add(voxels, query);
+  $('occupancy').hidden = false;
+}
+
+// all decompositions of a chair lie one after the other behind the points: offset of `m` in vertices
+function firstVertex(m) {
+  return 4096 + meta.count[chair].slice(0, m).reduce((a, b) => a + b, 0) * verts;
+}
+
+function showMethod(m) {
+  method = m;
+  if (sq) { scene.remove(sq); sq.geometry.dispose(); }
+  const count = meta.count[chair][m];
+  const pos = new Float32Array(buffer, firstVertex(m) * 12, count * verts * 3);
+  const col = new Float32Array(count * verts * 3), idx = new Uint32Array(count * faces);
+  for (let j = 0; j < count; j++) {
+    const c = color(j);
+    for (let v = 0; v < verts; v++) col.set([c.r, c.g, c.b], (j * verts + v) * 3);
+    for (let f = 0; f < faces; f++) idx[j * faces + f] = meta.faces[f] + j * verts;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeVertexNormals();
+  sq = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.75, transparent: true }));
+  scene.add(sq);
+  document.querySelectorAll('#ranking button').forEach(b => b.classList.toggle('on', +b.dataset.m === m));
+  update();
+}
+
+async function showChair(i) {
+  chair = (i + meta.ids.length) % meta.ids.length;
+  const id = meta.ids[chair], ticket = ++loading;
+  $('index').value = chair + 1;
+  $('id').textContent = id;
+  showRendering();
+  loadParts(id, ticket);
+  const buf = await fetch(`data/chairs/${id}.bin`).then(r => r.arrayBuffer());
+  if (ticket !== loading) return;
+  buffer = buf;
+  if (points) { scene.remove(points); points.geometry.dispose(); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(buffer, 0, 4096 * 3), 3));
+  points = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.006, color: 0xffffff }));
+  scene.add(points);
+  order = meta.methods.map((_, m) => m).sort((a, b) => meta.iou[chair][b] - meta.iou[chair][a]);
+  $('ranking').innerHTML = '';
+  order.forEach((m, rank) => {
+    const b = document.createElement('button');
+    b.dataset.m = m;
+    b.title = `mean over all chairs: ${meta.methods[m].mean.toFixed(3)}`;
+    b.innerHTML = `<span>${rank + 1}</span><span>${meta.methods[m].title}</span><span>${meta.count[chair][m]}</span><span>${meta.iou[chair][m].toFixed(3)}</span>`;
+    b.onclick = () => showMethod(m);
+    $('ranking').appendChild(b);
+  });
+  showMethod(method);
+}
+
+function showRendering() {
+  $('rgb').src = `data/rgb/${meta.ids[chair]}/rgb/t00_v0${$('view').value}.png`;
+}
+
+function update() {
+  if (sq) { sq.visible = $('showSq').checked; sq.material.opacity = +$('opacity').value; sq.material.depthWrite = +$('opacity').value > 0.99; }
+  if (points) points.visible = $('showPts').checked;
+  if (voxels) { voxels.visible = $('showVox').checked; query.visible = $('showQuery').checked; }
+  if (parts) parts.visible = $('showPart').checked;
+  $('partRow').hidden = !parts || !$('showPart').checked;
+}
+
+// optional: PartField's labels of this chair, see export_partfield.py
+const PART_POINTS = 16384;
+function colorParts() {
+  const level = +$('partLevel').value, labels = new Uint8Array(parts.userData.buffer, PART_POINTS * 12 + (level - 1) * PART_POINTS, PART_POINTS);
+  const a = parts.geometry.attributes.color, palette = new Map();
+  for (let i = 0; i < PART_POINTS; i++) {
+    if (!palette.has(labels[i])) palette.set(labels[i], color(labels[i]));
+    const c = palette.get(labels[i]);
+    a.array[3 * i] = c.r; a.array[3 * i + 1] = c.g; a.array[3 * i + 2] = c.b;
+  }
+  a.needsUpdate = true;
+  $('partCount').textContent = level;
+}
+
+async function loadParts(id, ticket) {
+  const response = await fetch(`data/partfield/${id}.bin`);
+  if (ticket !== loading) return;
+  if (parts) { scene.remove(parts); parts.geometry.dispose(); parts = null; }
+  $('partfield').hidden = !response.ok;
+  if (response.ok) {
+    const buffer = await response.arrayBuffer();
+    if (ticket !== loading) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(buffer, 0, PART_POINTS * 3), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(PART_POINTS * 3), 3));
+    parts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.007, vertexColors: true }));
+    parts.userData.buffer = buffer;
+    colorParts();
+    scene.add(parts);
+  }
+  update();
+}
+
+function stepRank(d) {
+  const r = order.indexOf(method) + d;
+  if (r >= 0 && r < order.length) showMethod(order[r]);
+}
+
+$('total').textContent = '/ ' + meta.ids.length;
+$('index').max = meta.ids.length;
+$('prev').onclick = () => showChair(chair - 1);
+$('next').onclick = () => showChair(chair + 1);
+$('random').onclick = () => showChair(Math.floor(Math.random() * meta.ids.length));
+$('index').addEventListener('change', e => showChair(+e.target.value - 1));
+$('view').addEventListener('input', showRendering);
+$('partLevel').addEventListener('input', () => parts && colorParts());
+['showSq', 'showPts', 'showVox', 'showQuery', 'showPart', 'opacity'].forEach(id => $(id).addEventListener('input', update));
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'number') return;
+  const act = { ArrowLeft: () => showChair(chair - 1), ArrowRight: () => showChair(chair + 1), ArrowUp: () => stepRank(-1), ArrowDown: () => stepRank(1),
+                r: () => $('random').onclick(), p: () => { $('showPts').checked = !$('showPts').checked; update(); },
+                v: () => { $('showVox').checked = !$('showVox').checked; update(); }, o: () => { $('showQuery').checked = !$('showQuery').checked; update(); },
+                f: () => { $('showPart').checked = !$('showPart').checked; update(); },
+                '[': () => { $('partLevel').stepDown(); if (parts) colorParts(); }, ']': () => { $('partLevel').stepUp(); if (parts) colorParts(); } }[e.key];
+  if (act) { e.preventDefault(); act(); }
+});
+
+showChair(0);
+</script>
+</body>
+</html>

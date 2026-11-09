@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQ Surface Sampling</title>
+<style>
+  :root { --bg: #15181d; --panel: rgba(28, 32, 39, 0.95); --fg: #e6e8eb; --muted: #9aa3ad; --accent: #5aa9ff; --line: #3a414b; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  #panel { position: absolute; top: 12px; left: 12px; width: 310px; background: var(--panel); border: 1px solid var(--line);
+           border-radius: 8px; padding: 12px 14px; max-height: calc(100% - 50px); overflow-y: auto; z-index: 2; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  .row { margin: 9px 0; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  select, input[type=range] { width: 100%; }
+  label { display: block; cursor: pointer; }
+  .two { display: flex; gap: 8px; } .two > * { flex: 1; min-width: 0; }
+  .sl { display: grid; grid-template-columns: 28px 1fr 44px; align-items: center; gap: 6px; }
+  .sl span:last-child { text-align: right; color: var(--muted); }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  #legend div { margin: 1px 0; }
+  #bar { height: 10px; border-radius: 3px; } #ticks { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { color: var(--muted); font-weight: normal; text-align: right; padding: 2px 3px; } th:first-child { text-align: left; }
+  td { padding: 2px 3px; text-align: right; } td:first-child { text-align: left; }
+  #list tr { cursor: pointer; } #list tr:hover td { background: rgba(90, 169, 255, .12); } #list tr.sel td { background: rgba(90, 169, 255, .25); }
+  #listWrap { max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 4px; }
+  #stats, .note { color: var(--muted); margin-top: 6px; }
+  .pane { position: absolute; top: 12px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+          padding: 4px 10px; font-size: 12px; z-index: 1; }
+  #paneL, #paneR { transform: translateX(-50%); }
+  #divider { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--line); }
+  #loading { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); color: var(--accent); display: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Exp 22: SQ surface sampling, grid vs cube</h1>
+  <div class="row"><div class="label">Source</div>
+    <select id="mode"><option value="frame">target SQs of a frame (with visibility)</option><option value="single">one synthetic SQ</option></select></div>
+  <div id="frameCtl">
+    <div class="row two">
+      <div><div class="label">Scene</div><select id="scene"></select></div>
+      <div><div class="label">Frame (← →)</div><select id="frame"></select></div>
+    </div>
+    <div class="row"><div class="label">Visibility rule</div>
+      <select id="rule"><option value="new">new (cached since 2026-11-07)</option><option value="old">old (smallest-SDF owner)</option></select></div>
+  </div>
+  <div id="singleCtl" style="display:none">
+    <div class="row"><div class="label">Synthetic SQ (half-axes m, exponents)</div>
+      <div class="sl"><span>a</span><input type="range" id="sa" min="0.02" max="2" step="0.01" value="1.5"><span id="va"></span></div>
+      <div class="sl"><span>b</span><input type="range" id="sb" min="0.02" max="2" step="0.01" value="1"><span id="vb"></span></div>
+      <div class="sl"><span>c</span><input type="range" id="sc" min="0.02" max="2" step="0.01" value="0.05"><span id="vc"></span></div>
+      <div class="sl"><span>ε1</span><input type="range" id="se1" min="0.1" max="1.9" step="0.01" value="0.15"><span id="ve1"></span></div>
+      <div class="sl"><span>ε2</span><input type="range" id="se2" min="0.1" max="1.9" step="0.01" value="0.2"><span id="ve2"></span></div>
+    </div>
+  </div>
+  <div class="row"><div class="label">Sample budget n (grid n × n; cube 6 × m × m)</div>
+    <select id="n"><option>4</option><option>6</option><option>8</option><option selected>16</option><option>24</option><option>32</option></select></div>
+  <div class="row"><div class="label">Color samples by</div>
+    <select id="colorBy"><option value="state">visibility state</option><option value="area">area per sample (vs. the SQ's mean)</option><option value="uniform">one color</option></select>
+    <div id="legend"></div></div>
+  <div class="row"><div class="label">Show</div>
+    <label><input type="checkbox" id="showRef" checked> reference surface (fine cube mesh)</label>
+    <label><input type="checkbox" id="showPts" checked> depth points</label>
+    <label><input type="checkbox" id="onlySel"> only the selected SQ</label>
+    <div class="sl"><span>size</span><input type="range" id="psize" min="2" max="14" step="1" value="6"><span id="vpsize"></span></div>
+  </div>
+  <div id="stats"></div>
+  <div class="row"><div class="label">SQs by |f grid − f cube| (click to select)</div>
+    <div id="listWrap"><table><thead><tr><th>SQ</th><th>class</th><th>ε1</th><th>f grid</th><th>f cube</th><th>max gap grid / cube (cm)</th></tr></thead><tbody id="list"></tbody></table></div></div>
+  <div class="note">f = visible / camera-facing area (what training uses). Max gap = the largest distance from a point of the fine
+    reference surface to the nearest sample: how far a target surface point can be from anything the Chamfer loss sees.</div>
+</div>
+<div id="divider"></div>
+<div class="pane" id="paneL">(η, ω) grid · <span id="nL"></span></div>
+<div class="pane" id="paneR">radial cube grid · <span id="nR"></span></div>
+<div id="loading">computing…</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const $ = id => document.getElementById(id);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setScissorTest(true);
+document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 100);
+camera.up.set(0, -1, 0);
+const controls = new OrbitControls(camera, renderer.domElement);
+const scenes = { grid: new THREE.Scene(), cube: new THREE.Scene() };
+for (const s of Object.values(scenes)) {
+  s.background = new THREE.Color(0x15181d);
+  s.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.4));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(1, -3, -2); s.add(sun);
+}
+const X0 = () => innerWidth > 900 ? 340 : 0;  // the panes start right of the panel
+const half = () => (innerWidth - X0()) / 2;
+function resize() {
+  renderer.setSize(innerWidth, innerHeight); camera.aspect = half() / innerHeight; camera.updateProjectionMatrix();
+  $('divider').style.left = (X0() + half()) + 'px';
+  $('paneL').style.left = (X0() + half() / 2) + 'px'; $('paneR').style.left = (X0() + 1.5 * half()) + 'px';
+}
+addEventListener('resize', resize); resize();
+renderer.setAnimationLoop(() => {
+  controls.update();
+  const w = half(), h = innerHeight;
+  [['grid', X0()], ['cube', X0() + w]].forEach(([k, x]) => { renderer.setViewport(x, 0, w, h); renderer.setScissor(x, 0, w, h); renderer.render(scenes[k], camera); });
+});
+
+const STATE = [[0.42, 0.44, 0.48], [0.96, 0.62, 0.18], [0.86, 0.26, 0.26], [0.30, 0.82, 0.45]];
+const STATE_NAMES = ['back-facing', 'facing, outside the image', 'facing, occluded', 'visible'];
+const DIV = [[59, 76, 192], [141, 176, 254], [221, 221, 221], [244, 154, 123], [180, 4, 38]];  // blue - white - red
+function div(x) {  // x in [-1, 1]
+  x = (Math.min(1, Math.max(-1, x)) + 1) / 2 * (DIV.length - 1);
+  const i = Math.min(DIV.length - 2, Math.floor(x)), f = x - i;
+  return [0, 1, 2].map(k => (DIV[i][k] + f * (DIV[i + 1][k] - DIV[i][k])) / 255);
+}
+const idColor = i => new THREE.Color().setHSL((i * 0.618034) % 1, 0.55, 0.6);
+
+let M = null, data = null, sel = null, objs = [], frames = {};
+
+function legend() {
+  const sw = c => `<span class="sw" style="background:rgb(${c.map(v => v * 255)})"></span>`;
+  const m = $('colorBy').value;
+  if (m === 'state') $('legend').innerHTML = STATE.map((c, i) => `<div>${sw(c)}${STATE_NAMES[i]}</div>`).join('') + (M && M.kinds.grid.ratios ? '' : '<div class="note">(no visibility for the synthetic SQ)</div>');
+  else if (m === 'area') {
+    const g = Array.from({ length: 11 }, (_, i) => `rgb(${div(i / 5 - 1).map(v => v * 255)})`).join(',');
+    $('legend').innerHTML = `<div id="bar" style="background:linear-gradient(90deg,${g})"></div><div id="ticks"><span>÷4 (dense)</span><span>mean</span><span>×4 (sparse)</span></div>`;
+  } else $('legend').innerHTML = '<div class="note">colored by SQ</div>';
+}
+
+function clear() { for (const o of objs) { o.parent.remove(o); o.geometry.dispose(); } objs = []; }
+function add(scene, o) { scene.add(o); objs.push(o); }
+
+function build() {
+  clear();
+  const S = M.sqs, m = M.ref_m, by = $('colorBy').value, size = +$('psize').value;
+  const show = s => !$('onlySel').checked || sel == null || s === sel;
+  for (const kind of ['grid', 'cube']) {
+    const { pts, st, area } = data[kind], N = M.kinds[kind].N;
+    const P = [], C = [];
+    for (let s = 0; s < S; s++) {
+      if (!show(s)) continue;
+      let mean = 0; for (let k = 0; k < N; k++) mean += area[s * N + k]; mean /= N;
+      const ic = idColor(s);
+      for (let k = 0; k < N; k++) {
+        const i = s * N + k;
+        P.push(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]);
+        let c = by === 'state' ? STATE[st[i]] : by === 'area' ? div(Math.log2(Math.max(area[i], 1e-12) / mean) / 2) : [ic.r, ic.g, ic.b];
+        if (sel != null && s !== sel && !$('onlySel').checked) c = c.map(v => v * 0.35);
+        C.push(...c);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+    add(scenes[kind], new THREE.Points(g, new THREE.PointsMaterial({ size, vertexColors: true, sizeAttenuation: false })));
+    if ($('showRef').checked) {  // reference: fine cube mesh, quads within each of the 6 face grids
+      const V = [], I = [];
+      for (let s = 0; s < S; s++) {
+        if (!show(s)) continue;
+        const o = V.length / 3, base = s * 6 * m * m;
+        for (let k = 0; k < 6 * m * m; k++) V.push(data.ref[3 * (base + k)], data.ref[3 * (base + k) + 1], data.ref[3 * (base + k) + 2]);
+        for (let f = 0; f < 6; f++) for (let i = 0; i < m - 1; i++) for (let j = 0; j < m - 1; j++) {
+          const a = o + f * m * m + i * m + j, b = a + 1, c = a + m, d = c + 1;
+          I.push(a, c, b, b, c, d);
+        }
+      }
+      const rg = new THREE.BufferGeometry();
+      rg.setAttribute('position', new THREE.Float32BufferAttribute(V, 3));
+      rg.setIndex(I); rg.computeVertexNormals();
+      add(scenes[kind], new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ color: 0x8a93a0, transparent: true, opacity: 0.28,
+        side: THREE.DoubleSide, depthWrite: false, roughness: 0.9 })));
+    }
+    if (data.xyz && $('showPts').checked) {
+      const g2 = new THREE.BufferGeometry();
+      g2.setAttribute('position', new THREE.BufferAttribute(data.xyz, 3));
+      g2.setAttribute('color', new THREE.BufferAttribute(Float32Array.from(data.rgb, v => Math.pow(v / 255, 2.2) * 0.7), 3));
+      add(scenes[kind], new THREE.Points(g2, new THREE.PointsMaterial({ size: 0.006, vertexColors: true })));
+    }
+  }
+  $('nL').textContent = `${M.kinds.grid.N} samples / SQ`;
+  $('nR').textContent = `${M.kinds.cube.N} samples / SQ (m = ${M.m})`;
+}
+
+function table() {
+  const S = M.sqs, R = M.kinds.grid.ratios, Rc = M.kinds.cube.ratios, f = x => x == null ? '–' : (+x).toFixed(2);
+  const rows = [...Array(S).keys()].map(s => ({ s, fg: R ? R.vis_facing[s] : null, fc: Rc ? Rc.vis_facing[s] : null,
+    gg: M.kinds.grid.gap_max[s] * 100, gc: M.kinds.cube.gap_max[s] * 100 }));
+  rows.sort((a, b) => R ? Math.abs(b.fg - b.fc) - Math.abs(a.fg - a.fc) : 0);
+  $('list').innerHTML = rows.map(r => `<tr data-s="${r.s}" class="${r.s === sel ? 'sel' : ''}"><td>${r.s}${M.pixels[r.s] ? '' : ' ·'}</td><td>${M.cls[r.s]}</td>
+    <td>${f(M.exponents[r.s][0])}</td><td>${f(r.fg)}</td><td>${f(r.fc)}</td><td>${r.gg.toFixed(0)} / ${r.gc.toFixed(0)}</td></tr>`).join('');
+  if (R) {
+    const own = [...Array(S).keys()].filter(s => M.pixels[s] > 0), mean = a => own.reduce((x, s) => x + a[s], 0) / Math.max(own.length, 1);
+    const med = a => { const b = own.map(s => a[s]).sort((x, y) => x - y); return b.length ? b[b.length >> 1] : NaN; };
+    $('stats').innerHTML = `${S} target SQs, ${own.length} own pixels (· = owns none). Over those: mean f grid ${mean(R.vis_facing).toFixed(3)},
+      cube ${mean(Rc.vis_facing).toFixed(3)}; median largest gap to the nearest sample grid ${(100 * med(M.kinds.grid.gap_max)).toFixed(0)} cm,
+      cube ${(100 * med(M.kinds.cube.gap_max)).toFixed(0)} cm.`;
+  } else {
+    $('stats').innerHTML = `largest distance from the surface to the nearest sample: grid ${(100 * M.kinds.grid.gap_max[0]).toFixed(1)} cm,
+      cube ${(100 * M.kinds.cube.gap_max[0]).toFixed(1)} cm (mean ${(100 * M.kinds.grid.gap_mean[0]).toFixed(1)} / ${(100 * M.kinds.cube.gap_mean[0]).toFixed(1)} cm);
+      the grid's cell areas sum to ${(100 * M.kinds.grid.area_total[0] / M.kinds.cube.area_total[0]).toFixed(0)} % of the surface (the pole caps are missing).`;
+  }
+}
+
+function focus(s) {
+  const k = M.kinds.cube.N, p = data.cube.pts;
+  const box = new THREE.Box3();
+  for (let i = 0; i < k; i++) box.expandByPoint(new THREE.Vector3(p[3 * (s * k + i)], p[3 * (s * k + i) + 1], p[3 * (s * k + i) + 2]));
+  const c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length();
+  controls.target.copy(c);
+  camera.position.copy(c.clone().add(new THREE.Vector3(0.3, -0.5, -1).normalize().multiplyScalar(Math.max(r, 0.2) * 1.3)));
+}
+
+async function load(keepView) {
+  $('loading').style.display = 'block';
+  const n = $('n').value;
+  const base = $('mode').value === 'frame'
+    ? [`api/samp/frame/${$('scene').value}/${$('frame').value}/`, `?n=${n}&rule=${$('rule').value}`]
+    : ['api/samp/single/', `?n=${n}&a=${$('sa').value}&b=${$('sb').value}&c=${$('sc').value}&e1=${$('se1').value}&e2=${$('se2').value}`];
+  const [meta, buf] = await Promise.all([fetch(base[0] + 'meta' + base[1]).then(r => r.json()), fetch(base[0] + 'data' + base[1]).then(r => r.arrayBuffer())]);
+  $('loading').style.display = 'none';
+  M = meta; data = {};
+  let at = 0;
+  const take = (T, len, bytes) => { const a = new T(buf.slice(at, at + len * bytes)); at += len * bytes; return a; };
+  for (const kind of ['grid', 'cube']) {
+    const L = M.sqs * M.kinds[kind].N;
+    data[kind] = { pts: take(Float32Array, 3 * L, 4), st: take(Uint8Array, L, 1), area: take(Float32Array, L, 4) };
+  }
+  data.ref = take(Float32Array, 3 * M.sqs * 6 * M.ref_m * M.ref_m, 4);
+  if (M.points) { data.xyz = take(Float32Array, 3 * M.points, 4); data.rgb = take(Uint8Array, 3 * M.points, 1); }
+  if (sel != null && sel >= M.sqs) sel = null;
+  if ($('mode').value === 'single') sel = null;
+  legend(); build(); table();
+  if (!keepView) {
+    if ($('mode').value === 'single') { controls.target.set(0, 0, 0); const r = Math.max(+$('sa').value, +$('sb').value, +$('sc').value); camera.position.set(r * 1.2, -r * 1.5, -r * 2.2); }
+    else { controls.target.set(0, 0, 2.5); camera.position.set(0, -0.3, -0.8); }
+  }
+}
+
+function sliders() { for (const k of ['a', 'b', 'c', 'e1', 'e2']) $('v' + k).textContent = (+$('s' + k).value).toFixed(2); $('vpsize').textContent = $('psize').value; }
+let tm = null;
+for (const k of ['a', 'b', 'c', 'e1', 'e2']) $('s' + k).addEventListener('input', () => { sliders(); clearTimeout(tm); tm = setTimeout(() => load(true), 120); });
+$('psize').addEventListener('input', () => { sliders(); build(); });
+$('mode').addEventListener('change', () => {
+  const f = $('mode').value === 'frame';
+  $('frameCtl').style.display = f ? '' : 'none'; $('singleCtl').style.display = f ? 'none' : '';
+  load();
+});
+['colorBy', 'showRef', 'showPts', 'onlySel'].forEach(id => $(id).addEventListener('input', () => { legend(); build(); }));
+$('n').addEventListener('change', () => load(true));
+$('rule').addEventListener('change', () => load(true));
+$('scene').addEventListener('change', () => { fillFrames(); sel = null; load(); });
+$('frame').addEventListener('change', () => { sel = null; load(true); });
+$('list').addEventListener('click', e => {
+  const tr = e.target.closest('tr'); if (!tr) return;
+  sel = +tr.dataset.s === sel ? null : +tr.dataset.s;
+  build(); table(); if (sel != null) focus(sel);
+});
+addEventListener('keydown', e => {
+  if ($('mode').value !== 'frame' || e.target.tagName === 'INPUT') return;
+  const s = $('frame'), d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  if (!d) return;
+  s.selectedIndex = Math.max(0, Math.min(s.options.length - 1, s.selectedIndex + d));
+  sel = null; load(true);
+});
+function fillFrames() { $('frame').innerHTML = frames[$('scene').value].map(f => `<option value="${f}">${String(f).padStart(6, '0')}</option>`).join(''); }
+
+sliders();
+frames = await fetch('api/occ/frames').then(r => r.json());
+$('scene').innerHTML = Object.keys(frames).map(s => `<option>${s}</option>`).join('');
+const qp = new URLSearchParams(location.search);  // sampling.html?scene=office_1&frame=720&sq=15  or  ?mode=single
+if (qp.get('mode') === 'single') { $('mode').value = 'single'; $('frameCtl').style.display = 'none'; $('singleCtl').style.display = ''; }
+if (qp.get('scene')) $('scene').value = qp.get('scene');
+fillFrames();
+if (qp.get('frame')) $('frame').value = qp.get('frame');
+if (qp.get('color')) $('colorBy').value = qp.get('color');
+await load();
+if (qp.get('sq') && $('mode').value === 'frame') { sel = +qp.get('sq'); $('onlySel').checked = qp.get('only') === '1'; build(); table(); focus(sel); }
+</script>
+</body>
+</html>
