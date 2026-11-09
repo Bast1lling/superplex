@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slot Pipeline Overview</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  /* layout: one reading column; a paper-style pipeline figure (two rows: grouping, geometry), then the losses */
+  :root { --bg: #f6f6f4; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #cfcfc9; --accent: #2f6fd6; --soft: #e9eff9;
+          --loss: #b5531c; --frozen: #8a8a84; --mono: ui-monospace, "SF Mono", Menlo, monospace; --sans: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #161615; --panel: #1f1f1d; --ink: #ebebe6; --muted: #9a9a94; --line: #45453f; --accent: #6d9ff0; --soft: #1e2a3d; --loss: #e59466; --frozen: #77776f; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #161615; --panel: #1f1f1d; --ink: #ebebe6; --muted: #9a9a94; --line: #45453f; --accent: #6d9ff0; --soft: #1e2a3d; --loss: #e59466; --frozen: #77776f; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans);
+         padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 60px; }
+  main { max-width: 1160px; margin: 0 auto; display: grid; gap: 30px; }
+  h1 { font-size: 26px; margin: 0; text-wrap: balance; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0 0 4px; }
+  p { margin: 0; max-width: 72ch; }
+  nav { display: flex; gap: 10px; flex-wrap: wrap; }
+  nav a { color: var(--accent); text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; background: var(--panel); }
+  nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
+  figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow-x: auto; }
+  #fig { display: block; width: 100%; min-width: 900px; height: auto; font-family: var(--sans); }
+  #fig .t { font-size: 14px; font-weight: 650; fill: var(--ink); }
+  #fig .s { font-size: 12px; fill: var(--muted); }
+  #fig .m { font-size: 11.5px; font-family: var(--mono); fill: var(--accent); }
+  #fig .l { font-size: 12.5px; fill: var(--loss); font-weight: 600; }
+  .losses { display: grid; gap: 12px; }
+  .eq { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: center; min-width: 0; }
+  .eq h3 { margin: 0; font-size: 14px; }
+  .eq h3 small { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; margin-top: 2px; }
+  .eq .f { overflow-x: auto; overflow-y: hidden; min-width: 0; }
+  @media (max-width: 700px) { .eq { grid-template-columns: 1fr; gap: 4px; } }
+</style>
+</head>
+<body>
+<main>
+  <header style="display:grid;gap:10px">
+    <h1>Slot Attention on DINO patches: one RGB-D frame → instances → superquadrics</h1>
+    <nav><a href="app.html#overfit">Overfit one frame</a><a href="app.html#general">Generalization</a></nav>
+  </header>
+
+  <figure><svg id="fig" viewBox="0 0 1160 600" role="img" aria-label="pipeline figure"></svg></figure>
+
+  <section class="losses">
+    <h2>Losses</h2>
+    <p style="color:var(--muted)">Slots are matched one-to-one to the GT instances by their masks (Hungarian), and each slot's parts to the instance's
+      target superquadrics by their Chamfer distance (Hungarian). All terms have weight 1.</p>
+    <div class="eq"><h3>Mask<small>cross-entropy</small></h3>
+      <div class="f">$$\mathcal{L}_\text{mask} = -\frac{1}{N}\sum_{n}\sum_{m} s_{nm}\,\log a_{n\,\sigma(m)}$$</div></div>
+    <div class="eq"><h3>Dice<small>per matched slot</small></h3>
+      <div class="f">$$\mathcal{L}_\text{dice} = 1-\frac{2\,|A\cap S|}{|A|+|S|}$$</div></div>
+    <div class="eq"><h3>Existence<small>slots and parts, BCE</small></h3>
+      <div class="f">$$\mathcal{L}_\text{exist} = \mathrm{BCE}(p,\,y),\qquad y = 1 \text{ if matched, else } 0$$</div></div>
+    <div class="eq"><h3>Chamfer<small>per matched part and target SQ</small></h3>
+      <div class="f">$$\mathcal{L}_\text{CD} = \frac{1}{|P|}\sum_{x\in P}\min_{y\in Q}\lVert x-y\rVert + \frac{1}{|Q|}\sum_{y\in Q}\min_{x\in P}\lVert x-y\rVert$$</div></div>
+    <div class="eq"><h3>Total</h3>
+      <div class="f">$$\mathcal{L} = \mathcal{L}_\text{mask} + \mathcal{L}_\text{dice} + \mathcal{L}^\text{slot}_\text{exist} + \mathcal{L}_\text{CD} + \mathcal{L}^\text{part}_\text{exist}$$</div></div>
+  </section>
+</main>
+<script>
+const NS = 'http://www.w3.org/2000/svg', svg = document.getElementById('fig');
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const hue = (i, l = 55) => `hsl(${((i * 0.618034) % 1) * 360}, 65%, ${l}%)`;
+function el(tag, attrs = {}, parent = svg, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  parent.appendChild(e); return e;
+}
+function txt(x, y, s, cls = 't', anchor = 'start') {  // "x_n", "L_{mask}": subscripts
+  const t = el('text', { x, y, class: cls, 'text-anchor': anchor });
+  let down = false;
+  s.split(/(_\{[^}]*\}|_[A-Za-z0-9]+)/).forEach(p => {
+    if (!p) return;
+    const sub = p[0] === '_';
+    el('tspan', sub ? { dy: down ? 0 : 3, 'font-size': '75%' } : { dy: down ? -3 : 0 }, t, sub ? p.replace(/^_\{?|\}$/g, '') : p);
+    down = sub;
+  });
+  return t;
+}
+const arrow = (x1, y1, x2, y2, c = 'ah') => el('line', { x1, y1, x2, y2, stroke: c === 'ahl' ? css('--loss') : c === 'aha' ? css('--accent') : css('--muted'), 'stroke-width': 1.5, 'marker-end': `url(#${c})` });
+function superellipse(cx, cy, a, b, eps, rot = 0, n = 64) {
+  let d = '';
+  for (let i = 0; i <= n; i++) {
+    const t = 2 * Math.PI * i / n, c = Math.cos(t), s = Math.sin(t);
+    const x = a * Math.sign(c) * Math.abs(c) ** eps, y = b * Math.sign(s) * Math.abs(s) ** eps;
+    d += (i ? 'L' : 'M') + (cx + x * Math.cos(rot) - y * Math.sin(rot)).toFixed(1) + ',' + (cy + x * Math.sin(rot) + y * Math.cos(rot)).toFixed(1);
+  }
+  return d + 'Z';
+}
+function image(x, y, w, h, b64) {
+  el('rect', { x, y, width: w, height: h, fill: css('--soft'), stroke: css('--line') });
+  if (b64) el('image', { x, y, width: w, height: h, href: 'data:image/png;base64,' + b64, preserveAspectRatio: 'none', style: 'image-rendering: pixelated' });
+  else txt(x + w / 2, y + h / 2, 'run export.py', 's', 'middle');
+}
+
+function draw(frame, pred) {
+  svg.innerHTML = '';
+  const defs = el('defs');
+  for (const [id, c] of [['ah', css('--muted')], ['ahl', css('--loss')], ['aha', css('--accent')]]) {
+    const m = el('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, defs);
+    el('path', { d: 'M0,0 L10,5 L0,10 z', fill: c }, m);
+  }
+  const ink = css('--ink'), muted = css('--muted'), line = css('--line'), accent = css('--accent'), panel = css('--panel'), soft = css('--soft'), loss = css('--loss');
+
+  // ---------------- row 1: grouping
+  // (a) RGB-D frame
+  txt(10, 22, '(a) RGB-D frame'); txt(10, 38, '168 × 300', 'm');
+  image(10, 48, 224, 125, frame?.rgb);
+  txt(10, 196, 'depth → 3D patch centroids x_n', 's');
+  txt(10, 213, '→ 3D positional embedding', 's');
+  txt(10, 230, '(gravity frame, z up)', 's');
+
+  // DINO encoder
+  arrow(238, 110, 258, 110);
+  el('path', { d: 'M262,62 L344,82 L344,138 L262,158 Z', fill: panel, stroke: css('--frozen'), 'stroke-dasharray': '4 3' });
+  txt(303, 105, 'DINOv3', 't', 'middle'); txt(303, 122, 'ViT-L/16', 's', 'middle'); txt(303, 176, 'frozen', 's', 'middle');
+  arrow(346, 110, 366, 110);
+
+  // (b) tokens
+  txt(372, 22, '(b) patch tokens'); txt(372, 38, '42 × 75 × 1024', 'm');
+  for (let k = 2; k >= 0; k--) { const g = el('g', { opacity: 1 - k * 0.25 });
+    for (let i = 0; i < 9; i++) for (let j = 0; j < 7; j++) el('rect', { x: 372 + k * 8 + i * 11, y: 66 - k * 8 + j * 11, width: 10, height: 10, fill: panel, stroke: accent, 'stroke-width': 0.6 }, g); }
+  el('circle', { cx: 425, cy: 178, r: 10, fill: panel, stroke: accent }); txt(425, 183, '+', 't', 'middle');
+  arrow(425, 166, 425, 148, 'aha');
+  el('path', { d: 'M200,226 C 300,226 330,178 413,178', fill: 'none', stroke: accent, 'stroke-width': 1.5, 'marker-end': 'url(#aha)' });
+  txt(440, 182, 'd = 128', 'm');
+
+  // (c) Slot Attention: each patch -> a distribution over the slots
+  arrow(480, 110, 506, 110);
+  txt(512, 22, '(c) Slot Attention'); txt(512, 38, 'K = 64 slots, T = 3 iterations', 'm');
+  el('rect', { x: 512, y: 48, width: 236, height: 196, rx: 8, fill: soft, stroke: line });
+  const K = 12, ex = [{ peak: 2, y: 54, lab: 'patch on the chair' }, { peak: 5, y: 146, lab: 'patch on the table' }];
+  ex.forEach(({ peak, y, lab }) => {
+    el('rect', { x: 526, y: y + 18, width: 22, height: 22, fill: hue(peak), stroke: ink, 'stroke-width': 1 });
+    txt(578, y + 12, lab, 's');
+    arrow(552, y + 29, 572, y + 29);
+    const base = y + 52;
+    for (let k = 0; k < K; k++) {
+      const p = k === peak ? 0.78 : (k === (peak + 3) % K ? 0.1 : 0.012);
+      const h = Math.max(2, 46 * p);
+      el('rect', { x: 578 + k * 13, y: base - h, width: 10, height: h, fill: hue(k), opacity: k === peak ? 1 : 0.7 });
+    }
+    el('line', { x1: 576, x2: 736, y1: base, y2: base, stroke: muted, 'stroke-width': 0.8 });
+    txt(738, base - 2, '…', 's');
+  });
+  txt(630, 262, 'each patch: a distribution over the slots', 's', 'middle');
+  txt(630, 278, '(the slots compete for the patches)', 's', 'middle');
+
+  // (d) masks + matching
+  arrow(752, 110, 776, 110);
+  txt(782, 22, '(d) masks'); txt(782, 38, 'argmax slot per patch', 'm');
+  image(782, 48, 224, 125, pred?.pred_masks);
+  txt(782, 192, 'GT instances', 's');
+  image(782, 198, 140, 78, frame?.labels);
+  el('path', { d: 'M1010,110 C 1060,112 1060,236 926,236', fill: 'none', stroke: loss, 'stroke-width': 1.5, 'stroke-dasharray': '5 3', 'marker-end': 'url(#ahl)', 'marker-start': 'url(#ahl)' });
+  txt(1060, 152, 'Hungarian', 'l'); txt(1060, 170, 'L_{mask}, L_{dice},', 'l'); txt(1060, 188, 'L_{exist}', 'l');
+
+  el('line', { x1: 10, x2: 1150, y1: 304, y2: 304, stroke: line, 'stroke-dasharray': '4 4' });
+
+  // ---------------- row 2: relative part decoder, one slot
+  const sc = hue(2), y0 = 330;
+  txt(10, y0, '(e) part queries'); txt(10, y0 + 16, 'per matched slot', 'm');
+  el('circle', { cx: 46, cy: y0 + 110, r: 20, fill: sc }); txt(46, y0 + 152, 'slot k', 's', 'middle');
+  txt(74, y0 + 115, '+', 't');
+  for (let g = 0; g < 16; g++) el('circle', { cx: 100 + (g % 4) * 19, cy: y0 + 82 + Math.floor(g / 4) * 19, r: 6, fill: panel, stroke: sc, 'stroke-width': 1.8 });
+  txt(128, y0 + 172, '16 part embeddings', 's', 'middle');
+
+  arrow(184, y0 + 110, 210, y0 + 110);
+  txt(216, y0, '(f) part decoder'); txt(216, y0 + 16, '2 layers', 'm');
+  ['self-attention among the parts', 'cross-attention to the slot\'s patches', 'feed-forward'].forEach((s, i) => {
+    el('rect', { x: 216, y: y0 + 46 + i * 46, width: 220, height: 36, rx: 6, fill: panel, stroke: line });
+    txt(326, y0 + 69 + i * 46, s, 's', 'middle');
+  });
+
+  arrow(440, y0 + 110, 468, y0 + 110);
+  txt(474, y0, '(g) pointer'); txt(474, y0 + 16, 'softmax over patches', 'm');
+  const blob = [[1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [1, 3], [2, 3], [3, 3], [1, 4], [3, 4]];
+  const wgt = blob.map(([i, j]) => Math.exp(-((i - 2.9) ** 2 + (j - 1.2) ** 2) / 1.4)), wm = Math.max(...wgt), ws = wgt.reduce((a, b) => a + b);
+  const C = 30, X0 = 484, Y0 = y0 + 38;
+  blob.forEach(([i, j], q) => el('rect', { x: X0 + i * C, y: Y0 + j * C, width: C - 2, height: C - 2, fill: sc, opacity: 0.12 + 0.85 * wgt[q] / wm, stroke: panel }));
+  blob.forEach(([i, j]) => el('circle', { cx: X0 + i * C + C / 2 - 1, cy: Y0 + j * C + C / 2 - 1, r: 2, fill: ink }));
+  const cx = blob.reduce((a, [i], q) => a + (X0 + i * C + C / 2 - 1) * wgt[q], 0) / ws, cy = blob.reduce((a, [, j], q) => a + (Y0 + j * C + C / 2 - 1) * wgt[q], 0) / ws;
+  el('circle', { cx, cy, r: 6, fill: 'none', stroke: ink, 'stroke-width': 2.2 });
+  txt(cx + 9, cy - 9, 'c_g', 't');
+  txt(474, y0 + 212, 'c_g = Σ_n w_{gn} x_n + Δ_g', 's');
+  txt(474, y0 + 229, 'mean of 3D patch centroids', 's');
+
+  arrow(648, y0 + 110, 676, y0 + 110);
+  txt(682, y0, '(h) superquadric parts'); txt(682, y0 + 16, 'scale, shape, R, centre, p', 'm');
+  const parts = [[770, y0 + 112, 66, 10, 0.25, 0], [722, y0 + 64, 11, 40, 0.3, -0.12], [714, y0 + 156, 6, 34, 0.6, 0], [826, y0 + 156, 6, 34, 0.6, 0], [758, y0 + 160, 6, 30, 0.6, 0], [792, y0 + 152, 6, 30, 0.6, 0]];
+  parts.forEach(([x, y, a, b, e, r]) => el('path', { d: superellipse(x, y, a, b, e, r), fill: sc, opacity: 0.82, stroke: panel, 'stroke-width': 1 }));
+  txt(790, y0 + 222, 'instance = union of parts', 's', 'middle');
+
+  arrow(866, y0 + 110, 890, y0 + 110);
+  txt(896, y0, 'prediction'); txt(896, y0 + 16, 'rendered SQs', 'm');
+  image(896, y0 + 30, 244, 136, pred?.pred_render);
+  txt(896, y0 + 192, 'Hungarian per instance', 'l'); txt(896, y0 + 210, 'L_{CD}, L_{exist} vs. the visible', 'l'); txt(896, y0 + 228, 'SuperFlex SQs', 'l');
+}
+
+(async () => {
+  let frame = null, pred = null;
+  try {
+    [frame, pred] = await Promise.all([fetch('data/frames/room_2_000500_visible.json').then(r => r.json()),
+                                        fetch('data/runs/overfit_parts/room_2_000500.json').then(r => r.json())]);
+  } catch (e) { /* placeholders */ }
+  draw(frame, pred);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => draw(frame, pred));
+})();
+document.addEventListener('DOMContentLoaded', () => {
+  const go = () => window.renderMathInElement ? renderMathInElement(document.body, { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }] }) : setTimeout(go, 50);
+  go();
+});
+</script>
+</body>
+</html>

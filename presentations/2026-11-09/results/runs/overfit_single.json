@@ -1,0 +1,116 @@
+{
+ "name": "overfit_single",
+ "args": {
+  "name": "overfit_single",
+  "variant": "single",
+  "frames": "room_2/000500",
+  "frame": "camera",
+  "yaw_aug": false,
+  "steps": 10000,
+  "batch": 4,
+  "eval_every": 1000,
+  "lr": 3e-05,
+  "lr_heads": 0.001,
+  "d": 128,
+  "K": 64,
+  "T": 3,
+  "seed": 0,
+  "depth": true,
+  "decoder": "head",
+  "targets": "single",
+  "losses": "pair_cd"
+ },
+ "history": [
+  {
+   "step": 1000,
+   "loss": 0.8115768432617188,
+   "mask_miou": 0.5974005264043808,
+   "ari": 0.9734022105158642,
+   "pair_iou_fr": 0.43239572644233704,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 2000,
+   "loss": 0.45964717864990234,
+   "mask_miou": 0.9548389029502868,
+   "ari": 0.9807818733617573,
+   "pair_iou_fr": 0.5373843908309937,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 3000,
+   "loss": 0.39256492257118225,
+   "mask_miou": 0.943644711971283,
+   "ari": 0.9812632279688887,
+   "pair_iou_fr": 0.6759934425354004,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 4000,
+   "loss": 0.3733562231063843,
+   "mask_miou": 0.9318688941001892,
+   "ari": 0.9818635133103025,
+   "pair_iou_fr": 0.7069888114929199,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 5000,
+   "loss": 0.3670143783092499,
+   "mask_miou": 0.9356364870071411,
+   "ari": 0.9839301774748568,
+   "pair_iou_fr": 0.7212315201759338,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 6000,
+   "loss": 0.3582697808742523,
+   "mask_miou": 0.9326248717308044,
+   "ari": 0.9833724444803125,
+   "pair_iou_fr": 0.7621162533760071,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 7000,
+   "loss": 0.37177884578704834,
+   "mask_miou": 0.942653660774231,
+   "ari": 0.985554134015768,
+   "pair_iou_fr": 0.6919265985488892,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 8000,
+   "loss": 0.3569227159023285,
+   "mask_miou": 0.9355070209503173,
+   "ari": 0.985239807327906,
+   "pair_iou_fr": 0.7774132490158081,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 9000,
+   "loss": 0.36303240060806274,
+   "mask_miou": 0.9376837205886841,
+   "ari": 0.9830620466496983,
+   "pair_iou_fr": 0.6568388342857361,
+   "targets": 28.0,
+   "active_slots": 28.0
+  },
+  {
+   "step": 10000,
+   "loss": 0.3593190014362335,
+   "mask_miou": 0.9351419448852539,
+   "ari": 0.9835545443444134,
+   "pair_iou_fr": 0.7035102844238281,
+   "targets": 28.0,
+   "active_slots": 28.0
+  }
+ ],
+ "seconds": 138.45290184020996
+}

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slot Runs Viewer</title>
+<style>
+  :root { --bg: #f6f6f4; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #ddddd8; --accent: #2f6fd6;
+          --train: #2f6fd6; --views: #c2410c; --scene: #15803d; --gap: #b8b8b2; --block: #e3e3de; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #161615; --panel: #1f1f1d; --ink: #ebebe6; --muted: #9a9a94; --line: #34342f; --accent: #6d9ff0;
+          --train: #6d9ff0; --views: #f08a4b; --scene: #4ade80; --gap: #5a5a55; --block: #2c2c29; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #161615; --panel: #1f1f1d; --ink: #ebebe6; --muted: #9a9a94; --line: #34342f; --accent: #6d9ff0;
+          --train: #6d9ff0; --views: #f08a4b; --scene: #4ade80; --gap: #5a5a55; --block: #2c2c29; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 13px/1.4 system-ui, sans-serif; display: grid; grid-template-columns: 400px 1fr; overflow: hidden; }
+  #side { border-right: 1px solid var(--line); overflow: auto; padding: 10px; background: var(--panel); }
+  h1 { font-size: 15px; margin: 0 0 4px; }
+  h1 a { color: var(--muted); font-weight: 400; font-size: 12px; text-decoration: none; margin-left: 6px; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 6px; }
+  .tabs { display: flex; gap: 6px; margin: 6px 0; }
+  .tabs a { padding: 3px 9px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); text-decoration: none; }
+  .tabs a.on { border-color: var(--accent); color: var(--accent); }
+  .run { padding: 5px 7px; border-radius: 5px; cursor: pointer; border: 1px solid transparent; }
+  .run:hover { background: var(--bg); }
+  .run.sel { border-color: var(--accent); background: var(--bg); }
+  .run small { color: var(--muted); display: block; font: 11px ui-monospace, monospace; }
+  #main { display: grid; grid-template-rows: 1fr auto auto; min-width: 0; min-height: 0; }
+  #view { position: relative; min-height: 0; }
+  #view canvas { display: block; }
+  .bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 6px 10px; border-top: 1px solid var(--line); background: var(--panel); }
+  #imgs { display: flex; gap: 8px; overflow-x: auto; padding: 6px 10px; border-top: 1px solid var(--line); background: var(--panel); }
+  #imgs figure { margin: 0; text-align: center; color: var(--muted); font-size: 11px; }
+  #imgs img, #imgs canvas { height: 190px; image-rendering: pixelated; border-radius: 3px; display: block; }
+  table { border-collapse: collapse; width: 100%; font: 11px ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  th { position: sticky; top: 0; background: var(--panel); cursor: pointer; text-align: right; padding: 2px 3px; border-bottom: 1px solid var(--line); }
+  td { text-align: right; padding: 1px 3px; }
+  tr.sel td { background: var(--accent); color: var(--panel); }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover td { background: var(--line); }
+  .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+  #tablewrap { max-height: 34vh; overflow: auto; border: 1px solid var(--line); border-radius: 4px; }
+  #strip { display: flex; flex-wrap: wrap; gap: 2px; }
+  #strip span { width: 11px; height: 14px; border-radius: 2px; cursor: pointer; }
+  #strip span.sel { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .legend { display: flex; gap: 10px; color: var(--muted); font-size: 11px; margin-top: 4px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
+  #curve svg { width: 100%; height: 150px; display: block; }
+  #fm { font: 11px ui-monospace, monospace; white-space: pre-wrap; color: var(--muted); }
+  label { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
+  select { font: inherit; }
+  @media (max-width: 800px) { body { grid-template-columns: 1fr; grid-template-rows: 50vh 50vh; overflow: auto; } }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="side">
+  <h1>Slot runs <a href="index.html">pipeline ↗</a></h1>
+  <div class="tabs"><a href="#overfit" id="t_overfit">Overfit one frame</a><a href="#general" id="t_general">Generalization</a></div>
+  <div id="runs"></div>
+  <div id="curvebox"><h2>Eval curve <select id="metric"><option value="pair_iou_fr">frustum IoU</option><option value="mask_miou">mask mIoU</option><option value="part_iou_fr">part IoU</option></select></h2>
+    <div id="curve"></div></div>
+  <div id="stripbox"><h2>Frames</h2><div id="strip"></div>
+    <div class="legend"><span><i style="background:var(--train)"></i>trained on</span><span><i style="background:var(--views)"></i>held-out views</span><span><i style="background:var(--scene)"></i>held-out scene</span></div></div>
+  <h2>This frame</h2><div id="fm"></div>
+  <h2>Instances <small id="tcount"></small></h2>
+  <div id="tablewrap"><table id="ttable"></table></div>
+</div>
+<div id="main">
+  <div id="view"></div>
+  <div class="bar">
+    <label><input type="checkbox" id="showPts" checked> points</label>
+    <label><input type="checkbox" id="showT"> target SQs</label>
+    <label><input type="checkbox" id="showP" checked> predicted SQs</label>
+    <label><input type="checkbox" id="solo"> selected instance only</label>
+  </div>
+  <div id="imgs"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = id => document.getElementById(id);
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 100);
+camera.up.set(0, -1, 0); camera.position.set(0, 0, -0.3);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 2.5);
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(1, -2, -1); scene.add(dl);
+const G = { pts: new THREE.Group(), t: new THREE.Group(), p: new THREE.Group(), u: new THREE.Group() };
+Object.values(G).forEach(g => scene.add(g));
+function resize() { const r = view.getBoundingClientRect(); renderer.setSize(r.width, r.height); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(view);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+(function loop() { renderer.setClearColor(css('--bg')); controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+
+const spow = (x, p) => Math.sign(x) * Math.pow(Math.abs(x), p);
+function sqGeometry(s, n = 14) {
+  const pos = [], idx = [], R = s.rot;
+  for (let i = 0; i <= n; i++) {
+    const eta = -Math.PI / 2 + Math.PI * i / n;
+    for (let j = 0; j <= 2 * n; j++) {
+      const om = -Math.PI + Math.PI * j / n, ce = spow(Math.cos(eta), s.shape[0]);
+      const l = [s.scale[0] * ce * spow(Math.cos(om), s.shape[1]), s.scale[1] * ce * spow(Math.sin(om), s.shape[1]), s.scale[2] * spow(Math.sin(eta), s.shape[0])];
+      pos.push(R[0] * l[0] + R[1] * l[1] + R[2] * l[2] + s.trans[0], R[3] * l[0] + R[4] * l[1] + R[5] * l[2] + s.trans[1], R[6] * l[0] + R[7] * l[1] + R[8] * l[2] + s.trans[2]);
+    }
+  }
+  const m = 2 * n + 1;
+  for (let i = 0; i < n; i++) for (let j = 0; j < 2 * n; j++) { const a = i * m + j; idx.push(a, a + m, a + 1, a + 1, a + m, a + m + 1); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+const hue = i => new THREE.Color().setHSL((i * 0.618034) % 1, 0.65, 0.55);  // = export.py's hue()
+const gray = new THREE.Color(0x777777), dark = new THREE.Color(0x262626);
+const bytes = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const f32 = s => new Float32Array(bytes(s).buffer), i16 = s => new Int16Array(bytes(s).buffer);
+const fmt = (v, d = 3) => v === undefined || v === null ? '–' : (typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(d)) : v);
+const getJSON = async u => (await fetch(u)).json();
+
+let index = null, set = 'overfit', run = null, runData = null, frameInfo = null, frame = null, pred = null, pts = null, selT = -1, sortKey = 'id', sortDir = 1;
+
+function clear(g) { while (g.children.length) { const c = g.children.pop(); c.geometry?.dispose(); } }
+function draw() {
+  Object.values(G).forEach(clear);
+  if (!frame || !pred) return;
+  const solo = $('solo').checked && selT >= 0;
+  if ($('showPts').checked) {
+    const xyz = [], col = [];
+    for (let i = 0; i < pts.label.length; i++) {
+      if (solo && pts.label[i] !== selT) continue;
+      const c = new THREE.Color(pts.rgb[3 * i] / 255, pts.rgb[3 * i + 1] / 255, pts.rgb[3 * i + 2] / 255);
+      xyz.push(pts.xyz[3 * i], pts.xyz[3 * i + 1], pts.xyz[3 * i + 2]); col.push(c.r, c.g, c.b);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(xyz, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    G.pts.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 0.012, vertexColors: true })));
+  }
+  frame.target_sqs.forEach(t => {
+    if (solo && t.t !== selT) return;
+    const mesh = new THREE.Mesh(sqGeometry(t), new THREE.MeshBasicMaterial({ color: hue(t.t), wireframe: true, transparent: true, opacity: t.t === selT ? 0.95 : 0.4 }));
+    mesh.userData = { t: t.t }; G.t.add(mesh);
+  });
+  pred.sqs.forEach(p => {
+    if (solo && p.t !== selT) return;
+    const matched = p.t >= 0;
+    if (!matched) return;
+    const mesh = new THREE.Mesh(sqGeometry(p), new THREE.MeshLambertMaterial({ color: matched ? hue(p.t) : gray, transparent: true, opacity: 0.75, side: THREE.DoubleSide }));
+    mesh.userData = { t: p.t, p }; (matched ? G.p : G.u).add(mesh);
+  });
+  G.t.visible = $('showT').checked; G.p.visible = $('showP').checked; G.u.visible = false;
+}
+['showPts', 'showT', 'showP', 'solo'].forEach(id => $(id).addEventListener('input', draw));
+
+function table() {
+  const cols = [['id', 'id'], ['px', 'px'], ['n_sq', 'SQs'], ['slot', 'slot'], ['patches', 'patch'], ['exist', 'exist'], ['n_parts', 'parts'], ['mask_iou', 'mask IoU'], ['iou_fr', 'IoU fr']];
+  const rows = frame.targets.map((t, i) => ({ ...t, ...pred.per_target[i] })).sort((a, b) => ((a[sortKey] ?? -1) - (b[sortKey] ?? -1)) * sortDir);
+  const t = $('ttable');
+  t.innerHTML = '<thead><tr><th></th>' + cols.map(([k, n]) => `<th data-k="${k}">${n}${sortKey === k ? (sortDir > 0 ? '↑' : '↓') : ''}</th>`).join('') + '</tr></thead><tbody>'
+    + rows.map(r => `<tr data-i="${r.id}" class="${r.id === selT ? 'sel' : ''}"><td><span class="sw" style="background:#${hue(r.id).getHexString()}"></span></td>`
+      + cols.map(([k]) => `<td>${fmt(r[k], k === 'exist' || k.includes('iou') ? 2 : 3)}</td>`).join('') + '</tr>').join('') + '</tbody>';
+  t.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => { const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; table(); });
+  t.querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => select(+tr.dataset.i));
+  $('tcount').textContent = `${frame.M} instances`;
+}
+
+function attnCanvas(i) {
+  const a = bytes(pred.attn[i]), gh = 42, gw = 75, c = document.createElement('canvas'); c.width = gw; c.height = gh;
+  const ctx = c.getContext('2d'), im = ctx.createImageData(gw, gh), col = hue(i);
+  for (let k = 0; k < a.length; k++) { const v = a[k] / 255;
+    im.data[4 * k] = 20 + (col.r * 255 - 20) * v; im.data[4 * k + 1] = 20 + (col.g * 255 - 20) * v; im.data[4 * k + 2] = 20 + (col.b * 255 - 20) * v; im.data[4 * k + 3] = 255; }
+  ctx.putImageData(im, 0, 0); return c;
+}
+function images() {
+  const ims = [['rgb', frame.rgb, 'RGB'], ['labels', frame.labels, 'GT instances'], ['pm', pred.pred_masks, 'predicted masks (gray: unmatched slot)'], ['pr', pred.pred_render, 'rendered predicted SQs']];
+  $('imgs').innerHTML = ims.map(([, b, n]) => `<figure><img src="data:image/png;base64,${b}" alt="${n}">${n}</figure>`).join('');
+  if (selT >= 0) { const f = document.createElement('figure'); f.appendChild(attnCanvas(selT)); f.append(`attention of slot ${pred.per_target[selT].slot} (instance ${selT})`); $('imgs').appendChild(f); }
+}
+function select(i) {
+  selT = selT === i ? -1 : i;
+  table(); draw(); images(); info();
+}
+function info() {}
+const ray = new THREE.Raycaster();
+renderer.domElement.addEventListener('dblclick', e => {
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
+  const hit = ray.intersectObjects([G.p, G.u, G.t].filter(g => g.visible).flatMap(g => g.children))[0];
+  if (hit && hit.object.userData.t >= 0) select(hit.object.userData.t);
+});
+
+function curve() {
+  const box = $('curve'), metric = $('metric').value, cv = runData.curves, splits = Object.keys(cv).filter(s => cv[s][metric]);
+  if (!splits.length) { box.innerHTML = '<p style="color:var(--muted)">no eval history</p>'; return; }
+  const W = 360, H = 150, L = 34, R = 8, T = 8, B = 20;
+  const all = splits.flatMap(s => cv[s][metric]), xmax = Math.max(...all.map(p => p[0])), ymax = Math.min(1, Math.max(0.1, ...all.map(p => p[1])) * 1.1);
+  const x = v => L + (W - L - R) * v / xmax, y = v => T + (H - T - B) * (1 - v / ymax);
+  const color = { train: css('--train'), views: css('--views'), scenes: css('--scene') };
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="eval curve">`;
+  for (let k = 0; k <= 4; k++) { const v = ymax * k / 4; svg += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${css('--line')}"/><text x="${L - 4}" y="${y(v) + 3}" font-size="9" text-anchor="end" fill="${css('--muted')}">${v.toFixed(2)}</text>`; }
+  svg += `<text x="${W - R}" y="${H - 5}" font-size="9" text-anchor="end" fill="${css('--muted')}">step ${xmax}</text><text x="${L}" y="${H - 5}" font-size="9" fill="${css('--muted')}">0</text>`;
+  splits.forEach(s => { const p = cv[s][metric]; svg += `<polyline fill="none" stroke-width="1.6" stroke="${color[s] || css('--ink')}" points="${p.map(q => `${x(q[0])},${y(q[1])}`).join(' ')}"/>`
+    + `<circle cx="${x(p[p.length - 1][0])}" cy="${y(p[p.length - 1][1])}" r="2.5" fill="${color[s] || css('--ink')}"/>`; });
+  box.innerHTML = svg + '</svg><div class="legend">' + splits.map(s => `<span><i style="background:${color[s] || css('--ink')}"></i>${s === 'scenes' ? 'held-out scene' : s === 'views' ? 'held-out views' : 'training frames'}: ${fmt(cv[s][metric].at(-1)[1], 3)}</span>`).join('') + '</div>';
+}
+$('metric').onchange = curve;
+
+function strip() {
+  const box = $('strip'); box.innerHTML = '';
+  const color = { train: '--train', views: '--views', scene: '--scene' };
+  runData.frames.forEach(f => { const s = document.createElement('span'); s.style.background = `var(${color[f.split]})`;
+    s.title = `${f.frame} (${f.split}) frustum IoU ${fmt(f.pair_iou_fr, 2)}`; s.className = f === frameInfo ? 'sel' : '';
+    s.onclick = () => loadFrame(f); box.appendChild(s); });
+  $('stripbox').hidden = runData.frames.length < 2;
+}
+
+async function loadFrame(f) {
+  frameInfo = f;
+  [frame, pred] = await Promise.all([getJSON(`data/frames/${f.tag}_${f.targets}.json`), getJSON(`data/runs/${run.name}/${f.tag}.json`)]);
+  pts = { xyz: f32(frame.points.xyz), rgb: bytes(frame.points.rgb), label: i16(frame.points.label) };
+  if (selT >= frame.M) selT = -1;
+  const m = pred.metrics;
+  $('fm').textContent = `mask mIoU ${fmt(m.mask_miou)}   ARI ${fmt(m.ari)}\nfrustum IoU ${fmt(m.pair_iou_fr)}` + (m.part_iou_fr !== undefined ? `   part IoU ${fmt(m.part_iou_fr)}` : '') + `\nactive slots ${m.active_slots} for ${m.targets} instances`;
+  strip(); table(); draw(); images(); info();
+}
+
+async function pickRun(r) {
+  run = r; selT = -1;
+  document.querySelectorAll('.run').forEach(el => el.classList.toggle('sel', el.dataset.name === r.name));
+  runData = await getJSON(`data/runs/${r.name}/run.json`); run.args = runData.args;
+  curve();
+  const first = runData.frames.find(f => f.split === 'views') || runData.frames[0];
+  await loadFrame(first);
+}
+
+function showSet() {
+  set = location.hash === '#general' ? 'general' : 'overfit';
+  ['overfit', 'general'].forEach(s => $('t_' + s).classList.toggle('on', s === set));
+  const rs = index[set], box = $('runs');
+  const lab = { train: 'train', views: 'views', scene: 'scene' };
+  box.innerHTML = rs.length ? '' : '<p style="color:var(--muted)">no runs exported yet</p>';
+  rs.forEach(r => { const d = document.createElement('div'); d.className = 'run'; d.dataset.name = r.name;
+    d.innerHTML = `${r.title}<small>${Object.entries(r.mean).map(([s, m]) => `${lab[s]}: IoU ${fmt(m.pair_iou_fr, 2)} mask ${fmt(m.mask_miou, 2)}`).join(' · ')}</small>`;
+    d.onclick = () => pickRun(r); box.appendChild(d); });
+  if (rs.length) pickRun(rs[set === 'overfit' ? rs.length - 1 : 0]);
+}
+window.addEventListener('hashchange', showSet);
+(async () => { index = await getJSON('data/index.json'); showSet(); })();
+</script>
+</body>
+</html>
